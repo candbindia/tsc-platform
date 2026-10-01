@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Help — TSC</title>
+<link rel="icon" href="favicon.svg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="content" style="max-width:760px;">
+  <div style="display:flex; align-items:center; gap:12px; margin-bottom:4px;">
+    <div class="ic" id="icHeader" style="width:36px; height:36px;"></div>
+    <h1 style="margin:0;">How TSC Works</h1>
+  </div>
+  <p class="subtitle">The Technology Spearheads Committee turns manual, repetitive work into automation — here's the journey a requirement takes from idea to "live," in 8 steps.</p>
+
+  <button class="secondary" style="width:auto; padding:9px 16px;" onclick="restartTour()">
+    <span id="icReplay"></span> Replay the guided tour
+  </button>
+
+  <div class="card" style="margin-top:20px;">
+    <h2>The 8-step journey</h2>
+    <div class="step-list" id="steps"></div>
+  </div>
+
+  <div class="card" style="margin-top:20px;">
+    <h2>Frequently asked</h2>
+    <div id="faq"></div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="icons.js"></script>
+<script src="nav.js"></script>
+<script src="tour.js"></script>
+<script>
+  const session = renderTopbar();
+  document.getElementById("icHeader").innerHTML = icon("book", 20);
+  document.getElementById("icReplay").innerHTML = icon("sparkle", 13);
+
+  const STEPS = [
+    { icon: "plus-circle", title: "1. Submit a requirement", text: "Any employee logs in and submits a manual process worth automating. It's auto-tagged with your name and department — no extra form-filling." },
+    { icon: "user-check", title: "2. Committee review", text: "The Committee reviews every new submission. They either reject it (with a reason you'll see) or assign it to a specific employee to assess feasibility." },
+    { icon: "gauge", title: "3. Feasibility scoring", text: "The assigned employee rates the idea across 10 weighted factors (effort, impact, complexity, and so on). The system computes a weighted score automatically and classifies it High, Medium, or Low priority." },
+    { icon: "check-circle", title: "4. Score validation", text: "The Committee reviews the submitted score, validates it, and can set a deadline for the work." },
+    { icon: "bolt", title: "5. Build", text: "The assigned owner starts work — the item moves to \"In progress\"." },
+    { icon: "send", title: "6. Submit for validation", text: "Once the work is done, the owner submits it back to the Committee for a final check." },
+    { icon: "shield", title: "7. Final validation", text: "The Committee confirms it's complete and marks it \"Live on board.\"" },
+    { icon: "rocket", title: "8. Live & discoverable", text: "The requirement appears on the Requirement Board for everyone to see. Once deployed, it can also be listed in the Automation Catalog, ready for others to use." },
+  ];
+
+  const FAQ = [
+    { q: "What happens right after I submit a requirement?", a: "It goes straight to the Committee. They'll either reject it with a reason, or assign a specific person to assess how feasible it is to automate." },
+    { q: "Who assigns the feasibility score, and can anyone do it?", a: "The Committee assigns one specific employee (by Employee ID) to score each item. Only that person can submit the score for it — it's enforced, not just a suggestion." },
+    { q: "What's the difference between the Board and the Catalog?", a: "The Requirement Board shows every requirement and exactly where it stands in the 8-step pipeline. The Automation Catalog lists automations that are already built and live, ready to use today." },
+    { q: "What does \"On Request\" mean in the Catalog?", a: "Some automations aren't openly downloadable. Requesting access sends your intended use straight to the owner, who'll reach out to you directly — nothing is handed out unsupervised." },
+    { q: "My Employee ID isn't recognized, or I forgot my password — what do I do?", a: "If your Employee ID isn't recognized, check with HR that it's active in the system. If you've already set a password and forgot it, contact your Admin for help." },
+    { q: "I'm Committee / Management — what can I do that employees can't?", a: "Committee members can reject, assign, and validate items from the Requirement Register. Management has full visibility into the Dashboard and Register but doesn't take review actions directly." },
+  ];
+
+  document.getElementById("steps").innerHTML = STEPS.map(
+    (s) =>
+      '<div class="step-item"><div class="step-num">' + icon(s.icon, 16) + "</div><div>" +
+      '<div class="step-title">' + escapeHtml(s.title) + "</div>" +
+      '<div class="step-desc">' + escapeHtml(s.text) + "</div></div></div>"
+  ).join("");
+
+  document.getElementById("faq").innerHTML = FAQ.map(
+    (f, i) =>
+      '<div class="faq-item" id="faq' + i + '"><div class="faq-q" onclick="toggleFaq(' + i + ')">' +
+      "<span>" + escapeHtml(f.q) + '</span><span class="chev">' + icon("chevron-right", 14) + "</span></div>" +
+      '<div class="faq-a">' + escapeHtml(f.a) + "</div></div>"
+  ).join("");
+
+  function toggleFaq(i) {
+    document.getElementById("faq" + i).classList.toggle("open");
+  }
+</script>
+</body>
+</html>

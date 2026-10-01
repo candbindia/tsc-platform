@@ -21,7 +21,7 @@
   <div class="card" style="max-width:480px; width:90%; max-height:85vh; overflow:auto;">
     <h2 id="actionTitle"></h2>
     <div id="actionFields"></div>
-    <button onclick="submitAction()">Confirm</button>
+    <button onclick="handleClick(this, submitAction)">Confirm</button>
     <button class="secondary" onclick="closeActionPanel()">Cancel</button>
     <div id="actionMessage"></div>
   </div>
@@ -29,7 +29,11 @@
 
 <script src="config.js"></script>
 <script src="auth.js"></script>
+<script src="icons.js"></script>
+<script src="toast.js"></script>
+<script src="status.js"></script>
 <script src="nav.js"></script>
+<script src="tour.js"></script>
 <script>
   let currentReqId = null;
   let currentAction = null;
@@ -43,8 +47,10 @@
       const data = await apiFetch("/tracker/requirements");
       renderList(data.items || []);
     } catch (err) {
-      document.getElementById("messageBox").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
+      showToast(err.message, "error");
     }
+
+    maybeStartTour(session);
   }
 
   function renderList(items) {
@@ -68,7 +74,7 @@
         "<td>" + escapeHtml(it["Submitted By"]) + "</td>" +
         "<td>" + escapeHtml(it["Department"]) + "</td>" +
         "<td>" + escapeHtml(it["Process / Activity Description"]) + "</td>" +
-        '<td><span class="badge">' + escapeHtml(status) + "</span></td>" +
+        "<td>" + statusBadge(status) + "</td>" +
         "<td>" + (it["Score"] ? escapeHtml(it["Score"]) + " (" + escapeHtml(it["Priority Classification"]) + ")" : "") + "</td>" +
         "<td>" + escapeHtml(it["Assigned Owner"]) + "</td>";
 
@@ -76,12 +82,12 @@
         let actions = "";
         if (status === "Submitted" || status === "Under committee review") {
           actions +=
-            btn("Assign for scoring", "openAssign('" + reqId + "')") +
-            btn("Reject", "openReject('" + reqId + "')");
+            btn(icon("user-check", 12) + " Assign", "openAssign('" + reqId + "')") +
+            btn(icon("x-circle", 12) + " Reject", "openReject('" + reqId + "')");
         } else if (status === "Score submitted") {
-          actions += btn("Validate score", "openValidateScore('" + reqId + "')");
+          actions += btn(icon("check-circle", 12) + " Validate score", "openValidateScore('" + reqId + "')");
         } else if (status === "Pending validation") {
-          actions += btn("Validate completion", "openValidateCompletion('" + reqId + "')");
+          actions += btn(icon("check-circle", 12) + " Validate", "openValidateCompletion('" + reqId + "')");
         }
         html += "<td>" + actions + "</td>";
       }
@@ -91,8 +97,10 @@
     document.getElementById("list").innerHTML = html;
   }
 
-  function btn(label, onclick) {
-    return '<button style="width:auto; margin:2px; padding:5px 9px; font-size:12px;" onclick="' + onclick + '">' + escapeHtml(label) + "</button>";
+  function btn(labelHtml, onclick) {
+    // labelHtml may contain an icon() call's output, so it is NOT escaped here —
+    // callers only ever pass static text + icon(), never raw user data.
+    return '<button style="width:auto; margin:2px; padding:5px 9px; font-size:12px;" onclick="' + onclick + '">' + labelHtml + "</button>";
   }
 
   function openPanel(title, fieldsHtml, action, reqId) {
@@ -161,8 +169,9 @@
         method: "POST",
         body: JSON.stringify(payload),
       });
-      document.getElementById("actionMessage").innerHTML = '<div class="success">Updated: ' + escapeHtml(data.status) + "</div>";
-      setTimeout(() => { closeActionPanel(); load(); }, 900);
+      closeActionPanel();
+      showToast("Updated: " + data.status, "success");
+      load();
     } catch (err) {
       document.getElementById("actionMessage").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
     }

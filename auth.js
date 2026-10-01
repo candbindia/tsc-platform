@@ -84,6 +84,38 @@ function getEmployeeId() {
   return payload ? payload.sub : null;
 }
 
+// ───────── Button loading state + generic submit/click wiring ─────────
+// Keeps every async action consistent: disable the button, show a spinner
+// in place of its label, restore it when the request settles either way.
+
+function setButtonLoading(btn, loading, loadingLabel) {
+  if (!btn) return;
+  if (loading) {
+    if (btn.dataset.originalText === undefined) btn.dataset.originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-spinner"></span>' + (loadingLabel || "Working…");
+  } else {
+    btn.disabled = false;
+    if (btn.dataset.originalText !== undefined) btn.innerHTML = btn.dataset.originalText;
+  }
+}
+
+// Wire a <form onsubmit="return handleFormSubmit(event, someAsyncFn)">.
+// Finds the form's submit button automatically and spins it.
+function handleFormSubmit(e, fn) {
+  e.preventDefault();
+  const btn = e.target.querySelector('button[type="submit"]');
+  setButtonLoading(btn, true);
+  Promise.resolve(fn()).finally(() => setButtonLoading(btn, false));
+  return false;
+}
+
+// Wire a plain <button onclick="handleClick(this, someAsyncFn)">.
+function handleClick(btn, fn) {
+  setButtonLoading(btn, true);
+  Promise.resolve(fn()).finally(() => setButtonLoading(btn, false));
+}
+
 // After login, send each role to the right landing page.
 function redirectAfterLogin(session) {
   if (session.role === "employee") {

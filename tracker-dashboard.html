@@ -6,38 +6,62 @@
 <title>Dashboard — TSC Tracker</title>
 <link rel="icon" href="favicon.svg">
 <link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
 <body>
 <div class="page wide">
   <h1>TSC Dashboard</h1>
   <p class="subtitle">A quick view of where everything stands across the pipeline.</p>
 
-  <div id="summary"></div>
+  <div class="stat-grid" id="statGrid"></div>
 
-  <div class="card">
-    <h2>Full detail</h2>
-    <p><a href="tracker-home.html">Open the Requirement Register</a> for the full list and, for Committee, the review actions.</p>
-    <p><a href="portal-catalog.html">Automation Catalog</a> &middot; <a href="portal-board.html">Requirement Board</a></p>
+  <div class="chart-grid">
+    <div class="card chart-card">
+      <h2>By status</h2>
+      <canvas id="statusChart"></canvas>
+    </div>
+    <div class="card chart-card">
+      <h2>By priority (scored items)</h2>
+      <canvas id="priorityChart"></canvas>
+    </div>
   </div>
 
-  <div id="messageBox"></div>
+  <div class="icon-card-grid" style="margin-top:4px;">
+    <a class="icon-card" href="tracker-home.html">
+      <div class="ic" id="icRegister"></div>
+      <div>
+        <div class="ic-title">Requirement Register</div>
+        <div class="ic-desc">The full list and, for Committee, the review actions.</div>
+      </div>
+    </a>
+    <a class="icon-card" href="portal-catalog.html">
+      <div class="ic" id="icCatalog"></div>
+      <div>
+        <div class="ic-title">Automation Catalog</div>
+        <div class="ic-desc">What's already live across the org.</div>
+      </div>
+    </a>
+    <a class="icon-card" href="portal-board.html">
+      <div class="ic" id="icBoard"></div>
+      <div>
+        <div class="ic-title">Requirement Board</div>
+        <div class="ic-desc">Everything requested, and where it stands.</div>
+      </div>
+    </a>
+  </div>
 </div>
 
 <script src="config.js"></script>
 <script src="auth.js"></script>
+<script src="icons.js"></script>
+<script src="toast.js"></script>
+<script src="status.js"></script>
 <script src="nav.js"></script>
+<script src="tour.js"></script>
 <script>
-  const STATUS_ORDER = [
-    "Submitted",
-    "Under committee review",
-    "Rejected",
-    "Assigned for scoring",
-    "Score submitted",
-    "Scored & assigned",
-    "In progress",
-    "Pending validation",
-    "Live on board",
-  ];
+  document.getElementById("icRegister").innerHTML = icon("list", 22);
+  document.getElementById("icCatalog").innerHTML = icon("archive", 22);
+  document.getElementById("icBoard").innerHTML = icon("kanban", 22);
 
   async function load() {
     const session = renderTopbar();
@@ -47,41 +71,96 @@
       const data = await apiFetch("/tracker/requirements");
       renderSummary(data.items || []);
     } catch (err) {
-      document.getElementById("messageBox").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
+      showToast(err.message, "error");
     }
+
+    maybeStartTour(session);
   }
 
   function renderSummary(items) {
     const total = items.length;
     const byStatus = {};
-    STATUS_ORDER.forEach((s) => (byStatus[s] = 0));
     const byPriority = { High: 0, Medium: 0, Low: 0 };
 
     items.forEach((it) => {
       const status = (it["Status"] || "").trim();
-      if (byStatus[status] === undefined) byStatus[status] = 0;
-      byStatus[status]++;
+      if (status) byStatus[status] = (byStatus[status] || 0) + 1;
       const p = (it["Priority Classification"] || "").trim();
       if (byPriority[p] !== undefined) byPriority[p]++;
     });
 
-    let html = '<div class="card"><h2>Total requirements: ' + total + "</h2>";
-    html += '<p class="subtitle">By status</p><p>';
-    STATUS_ORDER.forEach((s) => {
-      if (byStatus[s] > 0) {
-        html += '<span class="badge" style="margin:3px; display:inline-block;">' + escapeHtml(s) + ": " + byStatus[s] + "</span>";
-      }
+    const liveCount = byStatus["Live on board"] || 0;
+    const needsCommitteeAction =
+      (byStatus["Submitted"] || 0) + (byStatus["Under committee review"] || 0) + (byStatus["Score submitted"] || 0) + (byStatus["Pending validation"] || 0);
+
+    renderStats([
+      { icon: "clipboard", number: total, label: "Total requirements" },
+      { icon: "user-check", number: needsCommitteeAction, label: "Awaiting committee action" },
+      { icon: "check-circle", number: liveCount, label: "Live on board" },
+      { icon: "trending-up", number: byPriority.High, label: "High priority (scored)" },
+    ]);
+
+    try {
+      renderCharts(byStatus, byPriority);
+    } catch (err) {
+      // Chart.js is loaded from a CDN — if it's blocked or slow on someone's
+      // network, the rest of the dashboard (stats above) should still work.
+      document.querySelectorAll(".chart-card").forEach((el) => {
+        el.querySelector("canvas").outerHTML = '<p class="subtitle" style="margin:0;">Chart couldn\'t load — check your connection.</p>';
+      });
+    }
+  }
+
+  function renderStats(stats) {
+    let html = "";
+    stats.forEach((s) => {
+      html +=
+        '<div class="stat-tile"><div class="stat-icon">' + icon(s.icon, 20) + "</div><div>" +
+        '<div class="stat-number">' + s.number + "</div>" +
+        '<div class="stat-label">' + escapeHtml(s.label) + "</div>" +
+        "</div></div>";
     });
-    html += "</p>";
+    document.getElementById("statGrid").innerHTML = html;
+  }
 
-    html += '<p class="subtitle">By priority (scored items)</p><p>';
-    html +=
-      '<span class="badge" style="margin:3px; display:inline-block;">High: ' + byPriority.High + "</span>" +
-      '<span class="badge" style="margin:3px; display:inline-block;">Medium: ' + byPriority.Medium + "</span>" +
-      '<span class="badge" style="margin:3px; display:inline-block;">Low: ' + byPriority.Low + "</span>";
-    html += "</p></div>";
+  let statusChartInstance, priorityChartInstance;
 
-    document.getElementById("summary").innerHTML = html;
+  function renderCharts(byStatus, byPriority) {
+    const statusLabels = Object.keys(byStatus);
+    const statusData = statusLabels.map((s) => byStatus[s]);
+    const statusColors = statusLabels.map((s) => STATUS_COLORS[s] || "#646767");
+
+    const statusCtx = document.getElementById("statusChart");
+    if (statusChartInstance) statusChartInstance.destroy();
+    if (!statusLabels.length) {
+      statusCtx.getContext("2d").clearRect(0, 0, statusCtx.width, statusCtx.height);
+    } else {
+      statusChartInstance = new Chart(statusCtx, {
+        type: "doughnut",
+        data: { labels: statusLabels, datasets: [{ data: statusData, backgroundColor: statusColors, borderWidth: 0 }] },
+        options: {
+          plugins: { legend: { position: "bottom", labels: { color: "#9c9c97", font: { size: 11 }, padding: 10 } } },
+        },
+      });
+    }
+
+    const priorityLabels = ["High", "Medium", "Low"];
+    const priorityData = priorityLabels.map((p) => byPriority[p]);
+    const priorityColors = priorityLabels.map((p) => PRIORITY_COLORS[p]);
+
+    const priorityCtx = document.getElementById("priorityChart");
+    if (priorityChartInstance) priorityChartInstance.destroy();
+    priorityChartInstance = new Chart(priorityCtx, {
+      type: "bar",
+      data: { labels: priorityLabels, datasets: [{ data: priorityData, backgroundColor: priorityColors, borderRadius: 6, maxBarThickness: 60 }] },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: "#9c9c97" }, grid: { display: false } },
+          y: { ticks: { color: "#9c9c97", precision: 0 }, grid: { color: "#333330" } },
+        },
+      },
+    });
   }
 
   load();

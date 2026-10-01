@@ -9,8 +9,11 @@
 </head>
 <body>
 <div class="content">
-  <h1>Requirement Board</h1>
-  <p class="subtitle">What's already been requested, and where each one stands — check here before submitting something that may already be in motion.</p>
+  <div style="display:flex; align-items:center; gap:12px; margin-bottom:4px;">
+    <div class="ic" id="icHeader" style="width:36px; height:36px;"></div>
+    <h1 style="margin:0;">Requirement Board</h1>
+  </div>
+  <p class="subtitle">What's already been requested, and where each one stands — check here before submitting something that may already be in motion. Scroll sideways to see every column.</p>
 
   <div id="list"></div>
   <div id="messageBox"></div>
@@ -18,43 +21,63 @@
 
 <script src="config.js"></script>
 <script src="auth.js"></script>
+<script src="icons.js"></script>
+<script src="status.js"></script>
 <script src="nav.js"></script>
 <script>
+  document.getElementById("icHeader").innerHTML = icon("kanban", 20);
+
   async function load() {
     const session = renderTopbar();
     if (!session) return;
 
     try {
       const data = await apiFetch("/board");
-      renderList(data.items || []);
+      renderBoard(data.items || []);
     } catch (err) {
       document.getElementById("messageBox").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
     }
   }
 
-  function renderList(items) {
+  function renderBoard(items) {
     if (!items.length) {
       document.getElementById("list").innerHTML = '<p class="subtitle">Nothing on the board yet.</p>';
       return;
     }
 
-    let html =
-      "<table><tr><th>Requirement</th><th>Department</th><th>Status</th><th>Priority</th><th>Timeline</th></tr>";
+    // Group by status, preferring the known workflow order, then anything
+    // else alphabetically, so the board always makes sense even if a
+    // status shows up that isn't one of the 9 standard ones.
+    const groups = {};
     items.forEach((it) => {
-      html +=
-        "<tr><td>" +
-        escapeHtml(it["Requirement Name / Short Description"]) +
-        "</td><td>" +
-        escapeHtml(it["Department"]) +
-        '</td><td><span class="badge">' +
-        escapeHtml(it["Status"]) +
-        "</span></td><td>" +
-        escapeHtml(it["Priority Classification"]) +
-        "</td><td>" +
-        escapeHtml(it["Expected Timeline"]) +
-        "</td></tr>";
+      const s = (it["Status"] || "").trim() || "Unspecified";
+      (groups[s] = groups[s] || []).push(it);
     });
-    html += "</table>";
+
+    const known = Object.keys(STATUS_META).filter((s) => groups[s]);
+    const extra = Object.keys(groups).filter((s) => !STATUS_META[s]).sort();
+    const order = known.concat(extra);
+
+    let html = '<div class="kanban">';
+    order.forEach((status) => {
+      const colItems = groups[status];
+      html +=
+        '<div class="kanban-col"><div class="kanban-col-head">' +
+        '<span class="title">' + escapeHtml(status) + "</span>" +
+        '<span class="count">' + colItems.length + "</span>" +
+        "</div><div class=\"kanban-col-body\">";
+      colItems.forEach((it) => {
+        html +=
+          '<div class="kanban-card">' +
+          '<div class="k-title">' + escapeHtml(it["Requirement Name / Short Description"] || "Untitled") + "</div>" +
+          '<div class="subtitle" style="margin:0; font-size:12px;">' + icon("building", 10) + " " + escapeHtml(it["Department"]) + "</div>" +
+          '<div class="k-meta"><span>' + escapeHtml(it["Priority Classification"] || "—") + "</span>" +
+          "<span>" + escapeHtml(it["Expected Timeline"] || "") + "</span></div>" +
+          "</div>";
+      });
+      html += "</div></div>";
+    });
+    html += "</div>";
     document.getElementById("list").innerHTML = html;
   }
 

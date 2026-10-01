@@ -9,10 +9,13 @@
 </head>
 <body>
 <div class="content">
-  <h1>Submit a New Requirement</h1>
+  <div style="display:flex; align-items:center; gap:12px; margin-bottom:4px;">
+    <div class="ic" id="icHeader" style="width:36px; height:36px;"></div>
+    <h1 style="margin:0;">Submit a New Requirement</h1>
+  </div>
   <p class="subtitle">Found a manual process worth automating? Tell us about it — it'll be auto-tagged with your name and department.</p>
 
-  <div class="card" style="max-width:560px;">
+  <form class="card" style="max-width:560px;" onsubmit="return handleFormSubmit(event, submitRequirement);">
     <label for="functionArea">Function / Process Area</label>
     <input type="text" id="functionArea" placeholder="e.g. Finance, HR, Operations">
 
@@ -40,16 +43,19 @@
     <label for="submitterEmail">Your email (optional, so we can follow up)</label>
     <input type="email" id="submitterEmail">
 
-    <button onclick="submitRequirement()">Submit</button>
+    <button type="submit">Submit</button>
     <div id="messageBox"></div>
-  </div>
+  </form>
 </div>
 
 <script src="config.js"></script>
 <script src="auth.js"></script>
+<script src="icons.js"></script>
+<script src="toast.js"></script>
 <script src="nav.js"></script>
 <script>
   const session = renderTopbar();
+  document.getElementById("icHeader").innerHTML = icon("plus-circle", 20);
 
   async function submitRequirement() {
     const processDescription = document.getElementById("processDescription").value.trim();
@@ -76,10 +82,7 @@
         method: "POST",
         body: JSON.stringify(payload),
       });
-      box.innerHTML =
-        '<div class="success">Submitted — reference ' +
-        escapeHtml(data.requirementId) +
-        ". The committee has been notified and will review it. Track it under My Tasks.</div>";
+      showToast("Submitted — reference " + data.requirementId + ". Track it under My Tasks.", "success");
       document.getElementById("processDescription").value = "";
       document.getElementById("functionArea").value = "";
       document.getElementById("currentMethod").value = "";

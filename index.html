@@ -24,39 +24,43 @@
 
     <!-- EMPLOYEE FLOW -->
     <div id="employeePanel">
-      <div id="empStep1">
+      <form id="empStep1" onsubmit="return handleFormSubmit(event, checkEmployeeId);">
+        <div class="step-icon" id="iconStep1"></div>
         <label for="employeeId">Employee ID</label>
-        <input type="text" id="employeeId" placeholder="e.g. CB1102" autocomplete="off">
-        <button onclick="checkEmployeeId()">Continue</button>
-      </div>
+        <input type="text" id="employeeId" placeholder="e.g. CB1102" autocomplete="off" autofocus>
+        <button type="submit">Continue</button>
+      </form>
 
-      <div id="empStepLogin" class="hidden">
-        <p id="empLoginGreeting" class="subtitle"></p>
+      <form id="empStepLogin" class="hidden" onsubmit="return handleFormSubmit(event, employeeLoginSubmit);">
+        <div class="step-icon" id="iconStepLogin"></div>
+        <p id="empLoginGreeting" class="subtitle" style="text-align:center;"></p>
         <label for="empLoginPassword">Password</label>
         <input type="password" id="empLoginPassword">
-        <button onclick="employeeLoginSubmit()">Log in</button>
-        <button class="secondary" onclick="backToStep1()">Back</button>
-      </div>
+        <button type="submit">Log in</button>
+        <button type="button" class="secondary" onclick="backToStep1()">Back</button>
+      </form>
 
-      <div id="empStepRegister" class="hidden">
-        <p id="empRegisterGreeting" class="subtitle"></p>
+      <form id="empStepRegister" class="hidden" onsubmit="return handleFormSubmit(event, employeeRegisterSubmit);">
+        <div class="step-icon" id="iconStepRegister"></div>
+        <p id="empRegisterGreeting" class="subtitle" style="text-align:center;"></p>
         <label for="empNewPassword">Create a password</label>
         <input type="password" id="empNewPassword">
         <label for="empConfirmPassword">Confirm password</label>
         <input type="password" id="empConfirmPassword">
-        <button onclick="employeeRegisterSubmit()">Set password &amp; continue</button>
-        <button class="secondary" onclick="backToStep1()">Back</button>
-      </div>
+        <button type="submit">Set password &amp; continue</button>
+        <button type="button" class="secondary" onclick="backToStep1()">Back</button>
+      </form>
     </div>
 
     <!-- STAFF FLOW -->
-    <div id="staffPanel" class="hidden">
+    <form id="staffPanel" class="hidden" onsubmit="return handleFormSubmit(event, staffLoginSubmit);">
+      <div class="step-icon" id="iconStaff"></div>
       <label for="staffEmail">Office email</label>
       <input type="email" id="staffEmail" autocomplete="off">
       <label for="staffPassword">Password</label>
       <input type="password" id="staffPassword">
-      <button onclick="staffLoginSubmit()">Log in</button>
-    </div>
+      <button type="submit">Log in</button>
+    </form>
 
     <div id="messageBox"></div>
   </div>
@@ -64,7 +68,13 @@
 
 <script src="config.js"></script>
 <script src="auth.js"></script>
+<script src="icons.js"></script>
 <script>
+  document.getElementById("iconStep1").innerHTML = icon("user", 24);
+  document.getElementById("iconStepLogin").innerHTML = icon("key", 24);
+  document.getElementById("iconStepRegister").innerHTML = icon("key", 24);
+  document.getElementById("iconStaff").innerHTML = icon("log-in", 24);
+
   let currentEmployeeId = null;
   let currentEmployeeInfo = null;
 

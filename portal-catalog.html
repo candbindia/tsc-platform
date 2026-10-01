@@ -9,30 +9,43 @@
 </head>
 <body>
 <div class="content">
-  <h1>Automation Catalog</h1>
+  <div style="display:flex; align-items:center; gap:12px; margin-bottom:4px;">
+    <div class="ic" id="icHeader" style="width:36px; height:36px;"></div>
+    <h1 style="margin:0;">Automation Catalog</h1>
+  </div>
   <p class="subtitle">Automations already live. "Open" items link straight through. "On Request" items route a request to the owner — nothing is downloadable directly.</p>
 
-  <div id="list"></div>
+  <div style="margin-bottom:4px;">
+    <input type="text" id="searchBox" placeholder="Search by name, department, or description…" oninput="applyFilter()" style="max-width:360px;">
+  </div>
+
+  <div id="list" class="catalog-grid"></div>
   <div id="messageBox"></div>
 </div>
 
-<!-- Deployment request modal (simple inline panel, not a real modal) -->
-<div class="page hidden" id="requestPanel" style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); margin:0; max-width:none; display:flex; align-items:center; justify-content:center;">
+<!-- Deployment request panel -->
+<div class="page hidden" id="requestPanel" style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); margin:0; max-width:none; display:flex; align-items:center; justify-content:center;">
   <div class="card" style="max-width:420px; width:90%;">
-    <h2 id="requestTitle">Request deployment</h2>
+    <h2 id="requestTitle" style="margin:0 0 4px;">Request deployment</h2>
+    <p class="subtitle">Tell the owner what you'll use it for — they'll reach out directly.</p>
     <label for="intendedUse">What will you use this for?</label>
     <textarea id="intendedUse" rows="3" placeholder="e.g. For the Mumbai branch's weekly reconciliation"></textarea>
-    <button onclick="submitDeploymentRequest()">Send request</button>
-    <button class="secondary" onclick="closeRequestPanel()">Cancel</button>
+    <button id="sendRequestBtn" onclick="handleClick(this, submitDeploymentRequest)">Send request</button>
+    <button class="secondary" type="button" onclick="closeRequestPanel()">Cancel</button>
     <div id="requestMessage"></div>
   </div>
 </div>
 
 <script src="config.js"></script>
 <script src="auth.js"></script>
+<script src="icons.js"></script>
+<script src="toast.js"></script>
 <script src="nav.js"></script>
 <script>
   let currentCatalogId = null;
+  let allItems = [];
+
+  document.getElementById("icHeader").innerHTML = icon("archive", 20);
 
   async function load() {
     const session = renderTopbar();
@@ -40,49 +53,57 @@
 
     try {
       const data = await apiFetch("/catalog");
-      renderList(data.items || []);
+      allItems = data.items || [];
+      renderList(allItems);
     } catch (err) {
       document.getElementById("messageBox").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
     }
   }
 
+  function applyFilter() {
+    const q = document.getElementById("searchBox").value.trim().toLowerCase();
+    if (!q) return renderList(allItems);
+    const filtered = allItems.filter((it) =>
+      [it["Automation Name"], it["Department / Function"], it["Description"]]
+        .join(" ")
+        .toLowerCase()
+        .includes(q)
+    );
+    renderList(filtered);
+  }
+
   function renderList(items) {
     if (!items.length) {
-      document.getElementById("list").innerHTML = '<p class="subtitle">Nothing in the catalog yet.</p>';
+      document.getElementById("list").innerHTML = '<p class="subtitle">Nothing matches yet.</p>';
       return;
     }
 
-    let html = "<table><tr><th>Automation</th><th>Department</th><th>Description</th><th>Status</th><th>Access</th></tr>";
+    let html = "";
     items.forEach((it) => {
       const isOpen = (it["Access Type"] || "").trim() === "Open";
-      let accessCell;
+      let footer;
       if (isOpen && it["Access Link / Instructions"]) {
-        accessCell = '<a href="' + escapeHtml(it["Access Link / Instructions"]) + '" target="_blank">Open link</a>';
+        footer =
+          '<a href="' + escapeHtml(it["Access Link / Instructions"]) + '" target="_blank" style="display:inline-flex; align-items:center; gap:6px; font-weight:600; font-size:13px;">' +
+          icon("external-link", 13) + " Open</a>";
       } else if (isOpen) {
-        accessCell = '<span class="badge">Open</span>';
+        footer = '<span class="badge">Open</span>';
       } else {
-        accessCell =
-          '<button style="width:auto; margin:0; padding:6px 10px; font-size:13px;" onclick="openRequestPanel(\'' +
-          escapeHtml(it["Catalog ID"]) +
-          "', '" +
-          escapeHtml(it["Automation Name"]) +
-          "')\">Request access</button>";
+        footer =
+          '<button style="width:auto; margin:0; padding:7px 14px; font-size:13px;" onclick="openRequestPanel(\'' +
+          escapeHtml(it["Catalog ID"]) + "', '" + escapeHtml(it["Automation Name"]).replace(/'/g, "\\'") + '\')">' +
+          icon("send", 13) + " Request</button>";
       }
 
       html +=
-        "<tr><td>" +
-        escapeHtml(it["Automation Name"]) +
-        "</td><td>" +
-        escapeHtml(it["Department / Function"]) +
-        "</td><td>" +
-        escapeHtml(it["Description"]) +
-        '</td><td><span class="badge">' +
-        escapeHtml(it["Status"]) +
-        "</span></td><td>" +
-        accessCell +
-        "</td></tr>";
+        '<div class="catalog-card">' +
+        '<div class="cc-icon">' + icon("bolt", 20) + "</div>" +
+        '<div class="cc-title">' + escapeHtml(it["Automation Name"]) + "</div>" +
+        '<div class="cc-dept">' + icon("building", 11) + " " + escapeHtml(it["Department / Function"]) + "</div>" +
+        '<div class="cc-desc">' + escapeHtml(it["Description"]) + "</div>" +
+        '<div class="cc-footer"><span class="badge">' + escapeHtml(it["Status"]) + "</span>" + footer + "</div>" +
+        "</div>";
     });
-    html += "</table>";
     document.getElementById("list").innerHTML = html;
   }
 
@@ -105,8 +126,8 @@
         method: "POST",
         body: JSON.stringify({ catalogId: currentCatalogId, intendedUse }),
       });
-      document.getElementById("requestMessage").innerHTML =
-        '<div class="success">Request sent to ' + escapeHtml(data.routedTo) + ". They'll reach out to you directly.</div>";
+      closeRequestPanel();
+      showToast("Request sent to " + data.routedTo + " — they'll reach out to you directly.", "success");
     } catch (err) {
       document.getElementById("requestMessage").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
     }

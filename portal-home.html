@@ -12,23 +12,96 @@
   <h1>Welcome<span id="nameSpan"></span></h1>
   <p class="subtitle">Check what's already automated before submitting something new — it might already exist, or someone's already working on it.</p>
 
-  <div class="card">
-    <h2>Where to go</h2>
-    <p><a href="portal-catalog.html">Automation Catalog</a> — automations already live, ready to use.</p>
-    <p><a href="portal-board.html">Requirement Board</a> — what's already been requested and where it stands.</p>
-    <p><a href="portal-submit.html">Submit a New Requirement</a> — found a manual process worth automating? Start here.</p>
-    <p><a href="portal-my-tasks.html">My Tasks</a> — things you've submitted, or been assigned to score/build.</p>
+  <div class="stat-grid" id="statGrid"></div>
+
+  <div class="icon-card-grid">
+    <a class="icon-card" href="portal-catalog.html">
+      <div class="ic" id="icCatalog"></div>
+      <div>
+        <div class="ic-title">Automation Catalog</div>
+        <div class="ic-desc">Automations already live, ready to use.</div>
+      </div>
+    </a>
+    <a class="icon-card" href="portal-board.html">
+      <div class="ic" id="icBoard"></div>
+      <div>
+        <div class="ic-title">Requirement Board</div>
+        <div class="ic-desc">What's already been requested and where it stands.</div>
+      </div>
+    </a>
+    <a class="icon-card" href="portal-submit.html">
+      <div class="ic" id="icSubmit"></div>
+      <div>
+        <div class="ic-title">Submit a New Requirement</div>
+        <div class="ic-desc">Found a manual process worth automating? Start here.</div>
+      </div>
+    </a>
+    <a class="icon-card" href="portal-my-tasks.html">
+      <div class="ic" id="icTasks"></div>
+      <div>
+        <div class="ic-title">My Tasks</div>
+        <div class="ic-desc">Things you've submitted, or been assigned to score/build.</div>
+      </div>
+    </a>
   </div>
 </div>
 
 <script src="config.js"></script>
 <script src="auth.js"></script>
+<script src="icons.js"></script>
 <script src="nav.js"></script>
+<script src="tour.js"></script>
 <script>
-  const session = renderTopbar();
-  if (session) {
+  document.getElementById("icCatalog").innerHTML = icon("archive", 22);
+  document.getElementById("icBoard").innerHTML = icon("layers", 22);
+  document.getElementById("icSubmit").innerHTML = icon("plus-circle", 22);
+  document.getElementById("icTasks").innerHTML = icon("check-square", 22);
+
+  async function load() {
+    const session = renderTopbar();
+    if (!session) return;
     document.getElementById("nameSpan").textContent = ", " + session.name;
+
+    try {
+      const [catalog, board, tasks] = await Promise.all([
+        apiFetch("/catalog"),
+        apiFetch("/board"),
+        apiFetch("/my-tasks"),
+      ]);
+
+      const liveCount = (catalog.items || []).length;
+      const boardCount = (board.items || []).length;
+      const myItems = tasks.items || [];
+      const needsAction = myItems.filter((it) =>
+        ["Assigned for scoring", "Scored & assigned", "In progress"].includes(it["Status"])
+      ).length;
+
+      renderStats([
+        { icon: "package", number: liveCount, label: "Automations live" },
+        { icon: "layers", number: boardCount, label: "On the board" },
+        { icon: "user-check", number: needsAction, label: "Need your action" },
+        { icon: "check-square", number: myItems.length, label: "Total in My Tasks" },
+      ]);
+    } catch (err) {
+      // Stats are a nice-to-have — stay quiet if they fail to load.
+    }
+
+    maybeStartTour(session);
   }
+
+  function renderStats(stats) {
+    let html = "";
+    stats.forEach((s) => {
+      html +=
+        '<div class="stat-tile"><div class="stat-icon">' + icon(s.icon, 20) + "</div><div>" +
+        '<div class="stat-number">' + s.number + "</div>" +
+        '<div class="stat-label">' + escapeHtml(s.label) + "</div>" +
+        "</div></div>";
+    });
+    document.getElementById("statGrid").innerHTML = html;
+  }
+
+  load();
 </script>
 </body>
 </html>
