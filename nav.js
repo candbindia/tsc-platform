@@ -15,10 +15,18 @@ function renderTopbar() {
   const topbar = document.createElement("div");
   topbar.className = "topbar";
 
+  const logo = document.createElement("div");
+  logo.className = "brand-logo";
+  logo.innerHTML = '<span class="bar"></span><span class="brand-mark">C&amp;B</span><span class="brand-sub">TSC</span>';
+  topbar.appendChild(logo);
+
+  const right = document.createElement("div");
+  right.className = "topbar-right";
+
   const who = document.createElement("div");
   who.className = "who";
   who.innerHTML = "Logged in as <strong>" + escapeHtml(session.name) + "</strong> &middot; " + roleLabel(session.role);
-  topbar.appendChild(who);
+  right.appendChild(who);
 
   const nav = document.createElement("nav");
   if (session.role === "employee") {
@@ -37,7 +45,8 @@ function renderTopbar() {
       '<a href="portal-board.html">Board</a>' +
       '<span class="logout" onclick="logout()">Log out</span>';
   }
-  topbar.appendChild(nav);
+  right.appendChild(nav);
+  topbar.appendChild(right);
 
   document.body.insertBefore(topbar, document.body.firstChild);
   return session;

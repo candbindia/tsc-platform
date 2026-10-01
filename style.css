@@ -1,13 +1,43 @@
 /* Consulting & Beyond — Technology Spearheads Committee
-   Functional baseline styling — brand colors/fonts applied in a later pass. */
+   Theme: "Midnight Pro" — from the C&B Brand Guidelines (v. 2025).
+   Palette: Sunrise Amber #f2ac3c · Golden Hour #f8d65a · Starry White #faf8f3
+            Cloudy Grey #646767 · Midnight Ash #111111
+   Type: Urbanist (headings) / General Sans (body) */
+
+@import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;600;700;800&display=swap');
+@import url('https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap');
+
+:root {
+  --amber: #f2ac3c;
+  --amber-dark: #d9922a;
+  --golden: #f8d65a;
+  --grey: #646767;
+  --white: #faf8f3;
+  --ash: #111111;
+
+  --bg: #111111;
+  --card: #1b1b1a;
+  --card-alt: #232321;
+  --border: #333330;
+  --text: #faf8f3;
+  --text-muted: #9c9c97;
+
+  --error-bg: rgba(217, 83, 79, 0.14);
+  --error-text: #ff8d82;
+  --error-border: rgba(217, 83, 79, 0.35);
+
+  --success-bg: rgba(129, 201, 149, 0.14);
+  --success-text: #81c995;
+  --success-border: rgba(129, 201, 149, 0.32);
+}
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  background: #f4f5f6;
-  color: #222;
+  font-family: "General Sans", -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
 }
 
 .page {
@@ -17,28 +47,34 @@ body {
 }
 
 .page.wide {
-  max-width: 900px;
+  max-width: 1000px;
 }
 
 .card {
-  background: #fff;
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 32px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 h1 {
-  font-size: 22px;
+  font-family: "Urbanist", sans-serif;
+  font-weight: 800;
+  font-size: 24px;
+  color: var(--amber);
   margin: 0 0 4px;
 }
 
 h2 {
-  font-size: 17px;
+  font-family: "Urbanist", sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--amber);
   margin: 0 0 16px;
 }
 
 .subtitle {
-  color: #666;
+  color: var(--text-muted);
   font-size: 14px;
   margin: 0 0 24px;
 }
@@ -53,32 +89,43 @@ h2 {
   flex: 1;
   padding: 10px;
   text-align: center;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border);
   border-radius: 6px;
   cursor: pointer;
-  background: #fafafa;
+  background: var(--card-alt);
+  color: var(--text-muted);
   font-size: 14px;
 }
 
 .tab.active {
-  background: #3f4141;
+  background: var(--amber);
   color: #fff;
-  border-color: #3f4141;
+  border-color: var(--amber);
 }
 
 label {
   display: block;
   font-size: 13px;
-  color: #444;
+  color: var(--text-muted);
   margin: 14px 0 6px;
 }
 
 input, select, textarea {
   width: 100%;
   padding: 10px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 14px;
+  background: var(--card-alt);
+  color: var(--text);
+  font-family: inherit;
+}
+
+input::placeholder, textarea::placeholder { color: #6e6e69; }
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--amber);
 }
 
 textarea { resize: vertical; }
@@ -87,28 +134,30 @@ button {
   width: 100%;
   padding: 11px;
   margin-top: 20px;
-  background: #3f4141;
+  background: var(--amber);
   color: #fff;
   border: none;
   border-radius: 6px;
   font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
+  font-family: inherit;
 }
 
-button:hover { background: #2b2d2d; }
+button:hover { background: var(--amber-dark); }
 
 button.secondary {
-  background: #fff;
-  color: #3f4141;
-  border: 1px solid #3f4141;
+  background: transparent;
+  color: var(--amber);
+  border: 1px solid var(--amber);
 }
 
-button.secondary:hover { background: #f0f0f0; }
+button.secondary:hover { background: rgba(242, 172, 60, 0.1); }
 
 .error {
-  background: #fdecea;
-  color: #b3261e;
-  border: 1px solid #f5c6c3;
+  background: var(--error-bg);
+  color: var(--error-text);
+  border: 1px solid var(--error-border);
   padding: 10px 12px;
   border-radius: 6px;
   font-size: 13px;
@@ -116,9 +165,9 @@ button.secondary:hover { background: #f0f0f0; }
 }
 
 .success {
-  background: #eaf6ec;
-  color: #1e6b2e;
-  border: 1px solid #c3e6c9;
+  background: var(--success-bg);
+  color: var(--success-text);
+  border: 1px solid var(--success-border);
   padding: 10px 12px;
   border-radius: 6px;
   font-size: 13px;
@@ -127,31 +176,69 @@ button.secondary:hover { background: #f0f0f0; }
 
 .hidden { display: none !important; }
 
+/* Brand logo mark — vertical amber bar + "C&B" per the logo construction spec */
+.brand-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-logo .bar {
+  width: 4px;
+  align-self: stretch;
+  min-height: 26px;
+  background: var(--amber);
+  border-radius: 2px;
+}
+
+.brand-logo .brand-mark {
+  font-family: "Urbanist", sans-serif;
+  font-weight: 800;
+  font-size: 20px;
+  color: var(--text);
+  letter-spacing: 0.5px;
+}
+
+.brand-logo .brand-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.brand-logo.large .brand-mark { font-size: 30px; }
+.brand-logo.large .bar { min-height: 36px; width: 5px; }
+
 .topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 14px 24px;
-  background: #fff;
-  border-bottom: 1px solid #e5e5e5;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
 }
 
-.topbar .who { font-size: 14px; color: #444; }
-.topbar .who strong { color: #222; }
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.topbar .who { font-size: 14px; color: var(--text-muted); }
+.topbar .who strong { color: var(--text); }
 
 .topbar nav a {
   margin-left: 16px;
   font-size: 14px;
-  color: #3f4141;
+  color: var(--text-muted);
   text-decoration: none;
 }
 
-.topbar nav a:hover { text-decoration: underline; }
+.topbar nav a:hover { color: var(--amber); }
 
 .topbar .logout {
   margin-left: 16px;
   font-size: 13px;
-  color: #b3261e;
+  color: var(--error-text);
   cursor: pointer;
 }
 
@@ -165,22 +252,25 @@ table {
 th, td {
   text-align: left;
   padding: 10px 8px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--border);
 }
 
 th {
-  background: #fafafa;
-  color: #555;
+  background: var(--card-alt);
+  color: var(--text-muted);
   font-weight: 600;
 }
 
+td { color: var(--text); }
+
 .badge {
   display: inline-block;
-  padding: 2px 8px;
+  padding: 2px 10px;
   border-radius: 10px;
   font-size: 12px;
-  background: #eee;
-  color: #333;
+  font-weight: 600;
+  background: var(--golden);
+  color: var(--ash);
 }
 
 .content {
@@ -188,3 +278,5 @@ th {
   margin: 24px auto;
   padding: 0 16px;
 }
+
+a { color: var(--amber); }
