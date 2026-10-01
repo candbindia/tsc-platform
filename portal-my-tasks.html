@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Tasks — TSC</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="content">
+  <h1>My Tasks</h1>
+  <p class="subtitle">Things you've submitted, or been assigned to score or build.</p>
+
+  <div id="list"></div>
+  <div id="messageBox"></div>
+</div>
+
+<!-- Scoring panel -->
+<div class="page hidden" id="scorePanel" style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); margin:0; max-width:none; display:flex; align-items:center; justify-content:center; overflow:auto;">
+  <div class="card" style="max-width:480px; width:90%; max-height:85vh; overflow:auto;">
+    <h2 id="scoreTitle">Submit feasibility score</h2>
+    <p class="subtitle">Rate each factor from 1 (low) to 5 (high).</p>
+    <div id="scoreFields"></div>
+    <button onclick="submitScore()">Submit score</button>
+    <button class="secondary" onclick="closeScorePanel()">Cancel</button>
+    <div id="scoreMessage"></div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="nav.js"></script>
+<script>
+  const SCORE_FACTORS = [
+    { key: "manualEffort", label: "Manual Effort" },
+    { key: "businessImpact", label: "Business Impact" },
+    { key: "frequency", label: "Frequency" },
+    { key: "repetitiveness", label: "Repetitiveness" },
+    { key: "errorPotential", label: "Error Potential" },
+    { key: "ruleBasedNature", label: "Rule-Based Nature" },
+    { key: "dataAvailability", label: "Data Availability" },
+    { key: "technicalComplexity", label: "Technical Complexity" },
+    { key: "humanJudgement", label: "Human Judgement" },
+    { key: "standardisation", label: "Standardisation" },
+  ];
+
+  let currentRequirementId = null;
+  let myEmployeeId = null;
+
+  async function load() {
+    const session = renderTopbar();
+    if (!session) return;
+    myEmployeeId = getEmployeeId();
+
+    try {
+      const data = await apiFetch("/my-tasks");
+      renderList(data.items || []);
+    } catch (err) {
+      document.getElementById("messageBox").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
+    }
+  }
+
+  function renderList(items) {
+    if (!items.length) {
+      document.getElementById("list").innerHTML = '<p class="subtitle">Nothing here yet — things you submit or get assigned will show up here.</p>';
+      return;
+    }
+
+    let html = "";
+    items.forEach((it) => {
+      const reqId = it["Requirement ID"];
+      const status = it["Status"];
+      const isAssignedToMe = (it["Assigned Owner Employee ID"] || "").toString().trim() === myEmployeeId;
+
+      let actions = "";
+      if (status === "Assigned for scoring" && isAssignedToMe) {
+        actions = '<button style="width:auto; margin:8px 0 0; padding:6px 12px; font-size:13px;" onclick="openScorePanel(\'' + escapeHtml(reqId) + "')\">Submit score</button>";
+      } else if (status === "Scored & assigned" && isAssignedToMe) {
+        actions = '<button style="width:auto; margin:8px 0 0; padding:6px 12px; font-size:13px;" onclick="startWork(\'' + escapeHtml(reqId) + "')\">Start work</button>";
+      } else if (status === "In progress" && isAssignedToMe) {
+        actions = '<button style="width:auto; margin:8px 0 0; padding:6px 12px; font-size:13px;" onclick="submitForValidation(\'' + escapeHtml(reqId) + "')\">Submit for validation</button>";
+      }
+
+      html +=
+        '<div class="card">' +
+        "<strong>" + escapeHtml(reqId) + "</strong> &middot; <span class=\"badge\">" + escapeHtml(status) + "</span>" +
+        (it["Score"] ? " &middot; Score: " + escapeHtml(it["Score"]) + " (" + escapeHtml(it["Priority Classification"]) + ")" : "") +
+        "<p>" + escapeHtml(it["Process / Activity Description"]) + "</p>" +
+        (it["Deadline"] ? "<p class=\"subtitle\">Deadline: " + escapeHtml(it["Deadline"]) + "</p>" : "") +
+        actions +
+        "</div>";
+    });
+    document.getElementById("list").innerHTML = html;
+  }
+
+  function openScorePanel(reqId) {
+    currentRequirementId = reqId;
+    document.getElementById("scoreTitle").textContent = "Submit feasibility score — " + reqId;
+    document.getElementById("scoreMessage").innerHTML = "";
+    let fieldsHtml = "";
+    SCORE_FACTORS.forEach((f) => {
+      fieldsHtml +=
+        '<label for="sf_' + f.key + '">' + f.label + "</label>" +
+        '<select id="sf_' + f.key + '"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select>';
+    });
+    document.getElementById("scoreFields").innerHTML = fieldsHtml;
+    document.getElementById("scorePanel").classList.remove("hidden");
+  }
+
+  function closeScorePanel() {
+    document.getElementById("scorePanel").classList.add("hidden");
+  }
+
+  async function submitScore() {
+    const scores = {};
+    SCORE_FACTORS.forEach((f) => {
+      scores[f.key] = Number(document.getElementById("sf_" + f.key).value);
+    });
+
+    try {
+      const data = await apiFetch("/tracker/scoring/submit", {
+        method: "POST",
+        body: JSON.stringify({ requirementId: currentRequirementId, scores }),
+      });
+      document.getElementById("scoreMessage").innerHTML =
+        '<div class="success">Score submitted: ' + escapeHtml(data.score) + " (" + escapeHtml(data.classification) + "). Awaiting committee validation.</div>";
+      setTimeout(() => { closeScorePanel(); load(); }, 1200);
+    } catch (err) {
+      document.getElementById("scoreMessage").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
+    }
+  }
+
+  async function startWork(reqId) {
+    try {
+      await apiFetch("/tracker/requirements/progress", {
+        method: "POST",
+        body: JSON.stringify({ requirementId: reqId, action: "start" }),
+      });
+      load();
+    } catch (err) {
+      document.getElementById("messageBox").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
+    }
+  }
+
+  async function submitForValidation(reqId) {
+    try {
+      await apiFetch("/tracker/requirements/progress", {
+        method: "POST",
+        body: JSON.stringify({ requirementId: reqId, action: "submit_for_validation" }),
+      });
+      load();
+    } catch (err) {
+      document.getElementById("messageBox").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
+    }
+  }
+
+  load();
+</script>
+</body>
+</html>

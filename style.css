@@ -1,0 +1,190 @@
+/* Consulting & Beyond — Technology Spearheads Committee
+   Functional baseline styling — brand colors/fonts applied in a later pass. */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: #f4f5f6;
+  color: #222;
+}
+
+.page {
+  max-width: 480px;
+  margin: 60px auto;
+  padding: 0 16px;
+}
+
+.page.wide {
+  max-width: 900px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 32px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+h1 {
+  font-size: 22px;
+  margin: 0 0 4px;
+}
+
+h2 {
+  font-size: 17px;
+  margin: 0 0 16px;
+}
+
+.subtitle {
+  color: #666;
+  font-size: 14px;
+  margin: 0 0 24px;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.tab {
+  flex: 1;
+  padding: 10px;
+  text-align: center;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #fafafa;
+  font-size: 14px;
+}
+
+.tab.active {
+  background: #3f4141;
+  color: #fff;
+  border-color: #3f4141;
+}
+
+label {
+  display: block;
+  font-size: 13px;
+  color: #444;
+  margin: 14px 0 6px;
+}
+
+input, select, textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+textarea { resize: vertical; }
+
+button {
+  width: 100%;
+  padding: 11px;
+  margin-top: 20px;
+  background: #3f4141;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+button:hover { background: #2b2d2d; }
+
+button.secondary {
+  background: #fff;
+  color: #3f4141;
+  border: 1px solid #3f4141;
+}
+
+button.secondary:hover { background: #f0f0f0; }
+
+.error {
+  background: #fdecea;
+  color: #b3261e;
+  border: 1px solid #f5c6c3;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-top: 14px;
+}
+
+.success {
+  background: #eaf6ec;
+  color: #1e6b2e;
+  border: 1px solid #c3e6c9;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-top: 14px;
+}
+
+.hidden { display: none !important; }
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 24px;
+  background: #fff;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.topbar .who { font-size: 14px; color: #444; }
+.topbar .who strong { color: #222; }
+
+.topbar nav a {
+  margin-left: 16px;
+  font-size: 14px;
+  color: #3f4141;
+  text-decoration: none;
+}
+
+.topbar nav a:hover { text-decoration: underline; }
+
+.topbar .logout {
+  margin-left: 16px;
+  font-size: 13px;
+  color: #b3261e;
+  cursor: pointer;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-top: 16px;
+}
+
+th, td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid #eee;
+}
+
+th {
+  background: #fafafa;
+  color: #555;
+  font-weight: 600;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  background: #eee;
+  color: #333;
+}
+
+.content {
+  max-width: 1000px;
+  margin: 24px auto;
+  padding: 0 16px;
+}

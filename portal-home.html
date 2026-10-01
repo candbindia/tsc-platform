@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portal — TSC</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="content">
+  <h1>Welcome<span id="nameSpan"></span></h1>
+  <p class="subtitle">Check what's already automated before submitting something new — it might already exist, or someone's already working on it.</p>
+
+  <div class="card">
+    <h2>Where to go</h2>
+    <p><a href="portal-catalog.html">Automation Catalog</a> — automations already live, ready to use.</p>
+    <p><a href="portal-board.html">Requirement Board</a> — what's already been requested and where it stands.</p>
+    <p><a href="portal-submit.html">Submit a New Requirement</a> — found a manual process worth automating? Start here.</p>
+    <p><a href="portal-my-tasks.html">My Tasks</a> — things you've submitted, or been assigned to score/build.</p>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="nav.js"></script>
+<script>
+  const session = renderTopbar();
+  if (session) {
+    document.getElementById("nameSpan").textContent = ", " + session.name;
+  }
+</script>
+</body>
+</html>

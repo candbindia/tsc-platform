@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — TSC Tracker</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page wide">
+  <h1>TSC Dashboard</h1>
+  <p class="subtitle">A quick view of where everything stands across the pipeline.</p>
+
+  <div id="summary"></div>
+
+  <div class="card">
+    <h2>Full detail</h2>
+    <p><a href="tracker-home.html">Open the Requirement Register</a> for the full list and, for Committee, the review actions.</p>
+    <p><a href="portal-catalog.html">Automation Catalog</a> &middot; <a href="portal-board.html">Requirement Board</a></p>
+  </div>
+
+  <div id="messageBox"></div>
+</div>
+
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="nav.js"></script>
+<script>
+  const STATUS_ORDER = [
+    "Submitted",
+    "Under committee review",
+    "Rejected",
+    "Assigned for scoring",
+    "Score submitted",
+    "Scored & assigned",
+    "In progress",
+    "Pending validation",
+    "Live on board",
+  ];
+
+  async function load() {
+    const session = renderTopbar();
+    if (!session) return;
+
+    try {
+      const data = await apiFetch("/tracker/requirements");
+      renderSummary(data.items || []);
+    } catch (err) {
+      document.getElementById("messageBox").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
+    }
+  }
+
+  function renderSummary(items) {
+    const total = items.length;
+    const byStatus = {};
+    STATUS_ORDER.forEach((s) => (byStatus[s] = 0));
+    const byPriority = { High: 0, Medium: 0, Low: 0 };
+
+    items.forEach((it) => {
+      const status = (it["Status"] || "").trim();
+      if (byStatus[status] === undefined) byStatus[status] = 0;
+      byStatus[status]++;
+      const p = (it["Priority Classification"] || "").trim();
+      if (byPriority[p] !== undefined) byPriority[p]++;
+    });
+
+    let html = '<div class="card"><h2>Total requirements: ' + total + "</h2>";
+    html += '<p class="subtitle">By status</p><p>';
+    STATUS_ORDER.forEach((s) => {
+      if (byStatus[s] > 0) {
+        html += '<span class="badge" style="margin:3px; display:inline-block;">' + escapeHtml(s) + ": " + byStatus[s] + "</span>";
+      }
+    });
+    html += "</p>";
+
+    html += '<p class="subtitle">By priority (scored items)</p><p>';
+    html +=
+      '<span class="badge" style="margin:3px; display:inline-block;">High: ' + byPriority.High + "</span>" +
+      '<span class="badge" style="margin:3px; display:inline-block;">Medium: ' + byPriority.Medium + "</span>" +
+      '<span class="badge" style="margin:3px; display:inline-block;">Low: ' + byPriority.Low + "</span>";
+    html += "</p></div>";
+
+    document.getElementById("summary").innerHTML = html;
+  }
+
+  load();
+</script>
+</body>
+</html>

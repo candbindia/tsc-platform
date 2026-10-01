@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Submit a Requirement — TSC</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="content">
+  <h1>Submit a New Requirement</h1>
+  <p class="subtitle">Found a manual process worth automating? Tell us about it — it'll be auto-tagged with your name and department.</p>
+
+  <div class="card" style="max-width:560px;">
+    <label for="functionArea">Function / Process Area</label>
+    <input type="text" id="functionArea" placeholder="e.g. Finance, HR, Operations">
+
+    <label for="processDescription">What's the process? *</label>
+    <textarea id="processDescription" rows="3" placeholder="Describe what's being done manually today"></textarea>
+
+    <label for="currentMethod">How is it done today?</label>
+    <input type="text" id="currentMethod" placeholder="e.g. Excel, done by hand">
+
+    <label for="painPoint">What's the pain point?</label>
+    <textarea id="painPoint" rows="2" placeholder="Why is this worth fixing?"></textarea>
+
+    <label for="frequency">How often does it happen?</label>
+    <select id="frequency">
+      <option value="">Select...</option>
+      <option>Daily</option>
+      <option>Weekly</option>
+      <option>Monthly</option>
+      <option>Ad hoc</option>
+    </select>
+
+    <label for="manualEffort">Roughly how much time does it take?</label>
+    <input type="text" id="manualEffort" placeholder="e.g. 4 hrs/week">
+
+    <label for="submitterEmail">Your email (optional, so we can follow up)</label>
+    <input type="email" id="submitterEmail">
+
+    <button onclick="submitRequirement()">Submit</button>
+    <div id="messageBox"></div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="nav.js"></script>
+<script>
+  const session = renderTopbar();
+
+  async function submitRequirement() {
+    const processDescription = document.getElementById("processDescription").value.trim();
+    const box = document.getElementById("messageBox");
+    box.innerHTML = "";
+
+    if (!processDescription) {
+      box.innerHTML = '<div class="error">Please describe the process.</div>';
+      return;
+    }
+
+    const payload = {
+      functionArea: document.getElementById("functionArea").value.trim(),
+      processDescription,
+      currentMethod: document.getElementById("currentMethod").value.trim(),
+      painPoint: document.getElementById("painPoint").value.trim(),
+      frequency: document.getElementById("frequency").value,
+      manualEffort: document.getElementById("manualEffort").value.trim(),
+      submitterEmail: document.getElementById("submitterEmail").value.trim(),
+    };
+
+    try {
+      const data = await apiFetch("/requirements/submit", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      box.innerHTML =
+        '<div class="success">Submitted — reference ' +
+        escapeHtml(data.requirementId) +
+        ". The committee has been notified and will review it. Track it under My Tasks.</div>";
+      document.getElementById("processDescription").value = "";
+      document.getElementById("functionArea").value = "";
+      document.getElementById("currentMethod").value = "";
+      document.getElementById("painPoint").value = "";
+      document.getElementById("manualEffort").value = "";
+    } catch (err) {
+      box.innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
+    }
+  }
+</script>
+</body>
+</html>

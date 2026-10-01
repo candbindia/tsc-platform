@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Technology Spearheads Committee — Login</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+  <div class="card">
+    <h1>Technology Spearheads Committee</h1>
+    <p class="subtitle">Consulting &amp; Beyond</p>
+
+    <div class="tabs">
+      <div class="tab active" id="tabEmployee" onclick="showTab('employee')">Employee</div>
+      <div class="tab" id="tabStaff" onclick="showTab('staff')">Committee / Management</div>
+    </div>
+
+    <!-- EMPLOYEE FLOW -->
+    <div id="employeePanel">
+      <div id="empStep1">
+        <label for="employeeId">Employee ID</label>
+        <input type="text" id="employeeId" placeholder="e.g. CB1102" autocomplete="off">
+        <button onclick="checkEmployeeId()">Continue</button>
+      </div>
+
+      <div id="empStepLogin" class="hidden">
+        <p id="empLoginGreeting" class="subtitle"></p>
+        <label for="empLoginPassword">Password</label>
+        <input type="password" id="empLoginPassword">
+        <button onclick="employeeLoginSubmit()">Log in</button>
+        <button class="secondary" onclick="backToStep1()">Back</button>
+      </div>
+
+      <div id="empStepRegister" class="hidden">
+        <p id="empRegisterGreeting" class="subtitle"></p>
+        <label for="empNewPassword">Create a password</label>
+        <input type="password" id="empNewPassword">
+        <label for="empConfirmPassword">Confirm password</label>
+        <input type="password" id="empConfirmPassword">
+        <button onclick="employeeRegisterSubmit()">Set password &amp; continue</button>
+        <button class="secondary" onclick="backToStep1()">Back</button>
+      </div>
+    </div>
+
+    <!-- STAFF FLOW -->
+    <div id="staffPanel" class="hidden">
+      <label for="staffEmail">Office email</label>
+      <input type="email" id="staffEmail" autocomplete="off">
+      <label for="staffPassword">Password</label>
+      <input type="password" id="staffPassword">
+      <button onclick="staffLoginSubmit()">Log in</button>
+    </div>
+
+    <div id="messageBox"></div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script>
+  let currentEmployeeId = null;
+  let currentEmployeeInfo = null;
+
+  function showTab(which) {
+    document.getElementById("tabEmployee").classList.toggle("active", which === "employee");
+    document.getElementById("tabStaff").classList.toggle("active", which === "staff");
+    document.getElementById("employeePanel").classList.toggle("hidden", which !== "employee");
+    document.getElementById("staffPanel").classList.toggle("hidden", which !== "staff");
+    clearMessage();
+  }
+
+  function showError(msg) {
+    document.getElementById("messageBox").innerHTML = '<div class="error">' + msg + "</div>";
+  }
+
+  function clearMessage() {
+    document.getElementById("messageBox").innerHTML = "";
+  }
+
+  function backToStep1() {
+    document.getElementById("empStep1").classList.remove("hidden");
+    document.getElementById("empStepLogin").classList.add("hidden");
+    document.getElementById("empStepRegister").classList.add("hidden");
+    clearMessage();
+  }
+
+  async function checkEmployeeId() {
+    clearMessage();
+    const employeeId = document.getElementById("employeeId").value.trim();
+    if (!employeeId) return showError("Enter your Employee ID.");
+
+    try {
+      const res = await fetch(API_BASE + "/auth/employee/check-id", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeId }),
+      });
+      const data = await res.json();
+
+      if (!data.valid) {
+        if (data.reason === "inactive") {
+          return showError("This Employee ID is marked inactive. Contact HR.");
+        }
+        return showError("Employee ID not recognized. Contact HR if this seems wrong.");
+      }
+
+      currentEmployeeId = employeeId;
+      currentEmployeeInfo = data;
+      document.getElementById("empStep1").classList.add("hidden");
+
+      if (data.hasPassword) {
+        document.getElementById("empLoginGreeting").textContent = "Welcome back, " + data.name + ".";
+        document.getElementById("empStepLogin").classList.remove("hidden");
+      } else {
+        document.getElementById("empRegisterGreeting").textContent =
+          "Welcome, " + data.name + " — looks like this is your first visit. Set a password to continue.";
+        document.getElementById("empStepRegister").classList.remove("hidden");
+      }
+    } catch (err) {
+      showError("Couldn't reach the server. Try again in a moment.");
+    }
+  }
+
+  async function employeeLoginSubmit() {
+    clearMessage();
+    const password = document.getElementById("empLoginPassword").value;
+    if (!password) return showError("Enter your password.");
+
+    try {
+      const res = await fetch(API_BASE + "/auth/employee/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeId: currentEmployeeId, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) return showError(data.error || "Login failed.");
+
+      saveSession(data);
+      redirectAfterLogin(data);
+    } catch (err) {
+      showError("Couldn't reach the server. Try again in a moment.");
+    }
+  }
+
+  async function employeeRegisterSubmit() {
+    clearMessage();
+    const password = document.getElementById("empNewPassword").value;
+    const confirm = document.getElementById("empConfirmPassword").value;
+    if (!password || password.length < 6) return showError("Password must be at least 6 characters.");
+    if (password !== confirm) return showError("Passwords don't match.");
+
+    try {
+      const res = await fetch(API_BASE + "/auth/employee/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeId: currentEmployeeId, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) return showError(data.error || "Couldn't set password.");
+
+      saveSession(data);
+      redirectAfterLogin(data);
+    } catch (err) {
+      showError("Couldn't reach the server. Try again in a moment.");
+    }
+  }
+
+  async function staffLoginSubmit() {
+    clearMessage();
+    const email = document.getElementById("staffEmail").value.trim();
+    const password = document.getElementById("staffPassword").value;
+    if (!email || !password) return showError("Enter both email and password.");
+
+    try {
+      const res = await fetch(API_BASE + "/auth/staff/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) return showError(data.error || "Login failed.");
+
+      saveSession(data);
+      redirectAfterLogin(data);
+    } catch (err) {
+      showError("Couldn't reach the server. Try again in a moment.");
+    }
+  }
+
+  // If already logged in, skip straight past the login page.
+  (function () {
+    const existing = getSession();
+    if (existing && existing.token) redirectAfterLogin(existing);
+  })();
+</script>
+</body>
+</html>

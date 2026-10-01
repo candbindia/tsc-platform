@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Requirement Register — TSC Tracker</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page wide">
+  <h1>Requirement Register</h1>
+  <p class="subtitle">Every requirement submitted, with its current status. Committee members can act on items below; Management and Admin have view access.</p>
+
+  <div id="list"></div>
+  <div id="messageBox"></div>
+</div>
+
+<!-- Action panel (reject / assign for scoring / validate score / validate completion) -->
+<div class="page hidden" id="actionPanel" style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); margin:0; max-width:none; display:flex; align-items:center; justify-content:center; overflow:auto;">
+  <div class="card" style="max-width:480px; width:90%; max-height:85vh; overflow:auto;">
+    <h2 id="actionTitle"></h2>
+    <div id="actionFields"></div>
+    <button onclick="submitAction()">Confirm</button>
+    <button class="secondary" onclick="closeActionPanel()">Cancel</button>
+    <div id="actionMessage"></div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="nav.js"></script>
+<script>
+  let currentReqId = null;
+  let currentAction = null;
+  let session = null;
+
+  async function load() {
+    session = renderTopbar();
+    if (!session) return;
+
+    try {
+      const data = await apiFetch("/tracker/requirements");
+      renderList(data.items || []);
+    } catch (err) {
+      document.getElementById("messageBox").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
+    }
+  }
+
+  function renderList(items) {
+    if (!items.length) {
+      document.getElementById("list").innerHTML = '<p class="subtitle">No requirements submitted yet.</p>';
+      return;
+    }
+
+    const isCommittee = session.role === "Committee";
+
+    let html = "<table><tr><th>Req ID</th><th>Submitted By</th><th>Dept</th><th>Description</th><th>Status</th><th>Score</th><th>Assigned Owner</th>";
+    if (isCommittee) html += "<th>Actions</th>";
+    html += "</tr>";
+
+    items.forEach((it) => {
+      const reqId = it["Requirement ID"];
+      const status = it["Status"];
+
+      html +=
+        "<tr><td>" + escapeHtml(reqId) + "</td>" +
+        "<td>" + escapeHtml(it["Submitted By"]) + "</td>" +
+        "<td>" + escapeHtml(it["Department"]) + "</td>" +
+        "<td>" + escapeHtml(it["Process / Activity Description"]) + "</td>" +
+        '<td><span class="badge">' + escapeHtml(status) + "</span></td>" +
+        "<td>" + (it["Score"] ? escapeHtml(it["Score"]) + " (" + escapeHtml(it["Priority Classification"]) + ")" : "") + "</td>" +
+        "<td>" + escapeHtml(it["Assigned Owner"]) + "</td>";
+
+      if (isCommittee) {
+        let actions = "";
+        if (status === "Submitted" || status === "Under committee review") {
+          actions +=
+            btn("Assign for scoring", "openAssign('" + reqId + "')") +
+            btn("Reject", "openReject('" + reqId + "')");
+        } else if (status === "Score submitted") {
+          actions += btn("Validate score", "openValidateScore('" + reqId + "')");
+        } else if (status === "Pending validation") {
+          actions += btn("Validate completion", "openValidateCompletion('" + reqId + "')");
+        }
+        html += "<td>" + actions + "</td>";
+      }
+      html += "</tr>";
+    });
+    html += "</table>";
+    document.getElementById("list").innerHTML = html;
+  }
+
+  function btn(label, onclick) {
+    return '<button style="width:auto; margin:2px; padding:5px 9px; font-size:12px;" onclick="' + onclick + '">' + escapeHtml(label) + "</button>";
+  }
+
+  function openPanel(title, fieldsHtml, action, reqId) {
+    currentAction = action;
+    currentReqId = reqId;
+    document.getElementById("actionTitle").textContent = title + " — " + reqId;
+    document.getElementById("actionFields").innerHTML = fieldsHtml;
+    document.getElementById("actionMessage").innerHTML = "";
+    document.getElementById("actionPanel").classList.remove("hidden");
+  }
+
+  function closeActionPanel() {
+    document.getElementById("actionPanel").classList.add("hidden");
+  }
+
+  function openReject(reqId) {
+    openPanel(
+      "Reject requirement",
+      '<label for="f_reason">Reason</label><textarea id="f_reason" rows="3"></textarea>',
+      "reject",
+      reqId
+    );
+  }
+
+  function openAssign(reqId) {
+    openPanel(
+      "Assign for scoring",
+      '<label for="f_empId">Employee ID to assign</label><input type="text" id="f_empId" placeholder="e.g. CB1102">' +
+        '<label for="f_email">Their email (for notification)</label><input type="email" id="f_email">',
+      "assign_for_scoring",
+      reqId
+    );
+  }
+
+  function openValidateScore(reqId) {
+    openPanel(
+      "Validate score",
+      '<label for="f_deadline">Deadline (optional)</label><input type="date" id="f_deadline">',
+      "validate_score",
+      reqId
+    );
+  }
+
+  function openValidateCompletion(reqId) {
+    openPanel("Validate completion", '<p class="subtitle">This marks the item Live on the Requirement Board.</p>', "validate_completion", reqId);
+  }
+
+  async function submitAction() {
+    const payload = { requirementId: currentReqId, action: currentAction };
+
+    if (currentAction === "reject") {
+      payload.rejectionReason = document.getElementById("f_reason").value.trim();
+    } else if (currentAction === "assign_for_scoring") {
+      payload.assignedEmployeeId = document.getElementById("f_empId").value.trim();
+      payload.assignedOwnerEmail = document.getElementById("f_email").value.trim();
+      if (!payload.assignedEmployeeId) {
+        document.getElementById("actionMessage").innerHTML = '<div class="error">Employee ID is required.</div>';
+        return;
+      }
+    } else if (currentAction === "validate_score") {
+      payload.deadline = document.getElementById("f_deadline").value;
+    }
+
+    try {
+      const data = await apiFetch("/tracker/requirements/review", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      document.getElementById("actionMessage").innerHTML = '<div class="success">Updated: ' + escapeHtml(data.status) + "</div>";
+      setTimeout(() => { closeActionPanel(); load(); }, 900);
+    } catch (err) {
+      document.getElementById("actionMessage").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
+    }
+  }
+
+  load();
+</script>
+</body>
+</html>
