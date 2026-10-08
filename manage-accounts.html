@@ -92,6 +92,16 @@
   </div>
 </div>
 
+<!-- Confirm dialog -->
+<div class="modal-overlay hidden" id="confirmModal">
+  <div class="card">
+    <h2 id="confirmTitle">Are you sure?</h2>
+    <p class="subtitle" id="confirmText"></p>
+    <button id="confirmOk">Confirm</button>
+    <button class="secondary" id="confirmCancel">Cancel</button>
+  </div>
+</div>
+
 <script src="config.js"></script>
 <script src="auth.js"></script>
 <script src="icons.js"></script>
@@ -175,6 +185,7 @@
         "<td>" + actions + "</td></tr>";
     });
     html += "</table>";
+    if (users.length <= 1) html += '<p class="subtitle">You can\'t change your own account here. Create another staff account above and you\'ll see Reset password, Change role and Deactivate beside it.</p>';
     document.getElementById("staffList").innerHTML = html;
   }
 
@@ -263,8 +274,33 @@
     }
   }
 
-  function toggleStatus(btn, email, status) {
-    if (status === "Inactive" && !confirm("Deactivate " + email + "? They'll be logged out and unable to sign in.")) return;
+  // In-page confirmation popup (replaces the browser's confirm box).
+  function confirmDialog(title, text, okLabel) {
+    return new Promise((resolve) => {
+      const m = document.getElementById("confirmModal");
+      document.getElementById("confirmTitle").textContent = title;
+      document.getElementById("confirmText").textContent = text;
+      const ok = document.getElementById("confirmOk");
+      const cancel = document.getElementById("confirmCancel");
+      ok.textContent = okLabel || "Confirm";
+      function done(v) {
+        m.classList.add("hidden");
+        ok.onclick = cancel.onclick = null;
+        document.removeEventListener("keydown", onKey);
+        resolve(v);
+      }
+      function onKey(e) { if (e.key === "Escape") done(false); }
+      ok.onclick = () => done(true);
+      cancel.onclick = () => done(false);
+      m.onclick = (e) => { if (e.target === m) done(false); };
+      document.addEventListener("keydown", onKey);
+      m.classList.remove("hidden");
+      ok.focus();
+    });
+  }
+
+  async function toggleStatus(btn, email, status) {
+    if (status === "Inactive" && !(await confirmDialog("Deactivate account?", email + " will be logged out and unable to sign in until you reactivate them.", "Deactivate"))) return;
     handleClick(btn, async function () {
       try {
         await apiFetch("/admin/users/status", { method: "POST", body: JSON.stringify({ email, status }) });
@@ -311,8 +347,8 @@
     document.getElementById("empList").innerHTML = html;
   }
 
-  function resetEmployee(btn, id) {
-    if (!confirm("Clear the password for " + id + "? They will verify by email code and choose a new one next time they log in.")) return;
+  async function resetEmployee(btn, id) {
+    if (!(await confirmDialog("Reset password?", "This clears the password for " + id + ". They will verify by email code and choose a new one the next time they log in.", "Reset password"))) return;
     handleClick(btn, async function () {
       try {
         const data = await apiFetch("/admin/employees/reset-password", { method: "POST", body: JSON.stringify({ employeeId: id }) });
