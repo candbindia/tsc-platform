@@ -11,21 +11,56 @@
 <body>
 <div class="content">
   <h1>My Tasks</h1>
-  <p class="subtitle">Things you've submitted, or been assigned to score or build.</p>
+  <p class="subtitle">Things you've submitted, or been asked to score or build.</p>
 
   <div id="list"></div>
   <div id="messageBox"></div>
 </div>
 
 <!-- Scoring panel -->
-<div class="page hidden" id="scorePanel" style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); margin:0; max-width:none; display:flex; align-items:center; justify-content:center; overflow:auto;">
-  <div class="card" style="max-width:480px; width:90%; max-height:85vh; overflow:auto;">
+<div class="modal-overlay hidden" id="scorePanel">
+  <div class="card wide-modal">
     <h2 id="scoreTitle">Submit feasibility score</h2>
-    <p class="subtitle">Rate each factor from 1 (low) to 5 (high).</p>
+    <p class="subtitle">Rate each factor from 1 to 5. For every factor, <strong>5 means a better candidate for automation</strong>. Your score is averaged with the other scorers' scores.</p>
     <div id="scoreFields"></div>
+    <div id="scoreMessage"></div>
     <button onclick="handleClick(this, submitScore)">Submit score</button>
     <button class="secondary" onclick="closeScorePanel()">Cancel</button>
-    <div id="scoreMessage"></div>
+  </div>
+</div>
+
+<!-- Post update panel -->
+<div class="modal-overlay hidden" id="updatePanel">
+  <div class="card">
+    <h2 id="updateTitle">Post an update</h2>
+    <p class="subtitle">Tell the committee how it's going. A reference is optional here.</p>
+    <label for="updNotes">What's the update?</label>
+    <textarea id="updNotes" rows="3" placeholder="e.g. Data pull is working, starting on the report layout"></textarea>
+    <label for="updRef">Reference (optional)</label>
+    <input type="text" id="updRef" placeholder="Link, file name, tool name — anything that shows the work">
+    <div id="updateMessage"></div>
+    <button onclick="handleClick(this, postUpdate)">Post update</button>
+    <button class="secondary" onclick="closeUpdatePanel()">Cancel</button>
+  </div>
+</div>
+
+<!-- Submit for validation panel -->
+<div class="modal-overlay hidden" id="validatePanel">
+  <div class="card">
+    <h2 id="validateTitle">Submit for validation</h2>
+    <p class="subtitle">Tell the committee where to check your work. It can be a link, a file update, a tool update — anything.</p>
+    <label for="valRef">Where can they check it? <span style="color:var(--danger, #c0392b);">*</span></label>
+    <input type="text" id="valRef" placeholder="e.g. link to the sheet/tool, or &quot;Updated file on shared drive: Reports/Q3.xlsx&quot;">
+    <label for="valNotes">Notes (optional)</label>
+    <textarea id="valNotes" rows="3" placeholder="Anything the reviewers should know"></textarea>
+    <div class="access-list">
+      <strong>Please give access to these people:</strong>
+      <div id="reviewerList" style="margin-top:6px;">Loading…</div>
+    </div>
+    <label class="check-row"><input type="checkbox" id="valAccess"> <span>I've given the people above access to the work.</span></label>
+    <div id="validateMessage"></div>
+    <button onclick="handleClick(this, submitForValidation)">Submit for validation</button>
+    <button class="secondary" onclick="closeValidatePanel()">Cancel</button>
   </div>
 </div>
 
@@ -36,33 +71,59 @@
 <script src="status.js"></script>
 <script src="nav.js"></script>
 <script>
+  // For every factor, 5 = better candidate for automation.
   const SCORE_FACTORS = [
-    { key: "manualEffort", label: "Manual Effort" },
-    { key: "businessImpact", label: "Business Impact" },
-    { key: "frequency", label: "Frequency" },
-    { key: "repetitiveness", label: "Repetitiveness" },
-    { key: "errorPotential", label: "Error Potential" },
-    { key: "ruleBasedNature", label: "Rule-Based Nature" },
-    { key: "dataAvailability", label: "Data Availability" },
-    { key: "technicalComplexity", label: "Technical Complexity" },
-    { key: "humanJudgement", label: "Human Judgement" },
-    { key: "standardisation", label: "Standardisation" },
+    { key: "manualEffort", label: "Manual Effort",
+      desc: "How much human time and effort the task takes today.",
+      low: "Very little manual effort", high: "Takes a lot of manual effort" },
+    { key: "businessImpact", label: "Business Impact",
+      desc: "How much the business gains (time, money, quality, client experience) if this is automated.",
+      low: "Minimal benefit", high: "Major benefit" },
+    { key: "frequency", label: "Frequency",
+      desc: "How often the task is done.",
+      low: "Rarely (a few times a year)", high: "Daily or many times a day" },
+    { key: "repetitiveness", label: "Repetitiveness",
+      desc: "How similar each run is to the last one.",
+      low: "Different every time", high: "Same steps every time" },
+    { key: "errorPotential", label: "Error Potential",
+      desc: "How likely people are to make mistakes doing it by hand.",
+      low: "Errors are rare", high: "Errors happen often or are costly" },
+    { key: "ruleBasedNature", label: "Rule-Based Nature",
+      desc: "Whether the task follows clear, fixed rules a system could apply.",
+      low: "Mostly judgement calls", high: "Clear rules with no exceptions" },
+    { key: "dataAvailability", label: "Data Availability",
+      desc: "Whether the data needed is digital, accessible and in a usable format.",
+      low: "Paper / scattered / locked away", high: "Digital, structured and easy to reach" },
+    { key: "technicalComplexity", label: "Technical Complexity",
+      desc: "How difficult it would be to build. Scored the opposite way: a simple build is a better candidate.",
+      low: "Very complex to build", high: "Simple to build" },
+    { key: "humanJudgement", label: "Human Judgement",
+      desc: "How much human judgement the task needs. Scored the opposite way: little judgement is a better candidate.",
+      low: "Needs a lot of human judgement", high: "Little or no judgement needed" },
+    { key: "standardisation", label: "Standardisation",
+      desc: "How standard the inputs, formats and process are across teams or cases.",
+      low: "Everyone does it differently", high: "One standard way of doing it" },
   ];
 
   let currentRequirementId = null;
-  let myEmployeeId = null;
 
   async function load() {
     const session = renderTopbar();
     if (!session) return;
-    myEmployeeId = getEmployeeId();
-
     try {
       const data = await apiFetch("/my-tasks");
       renderList(data.items || []);
     } catch (err) {
       showToast(err.message, "error");
     }
+  }
+
+  function roleChips(roles) {
+    let out = "";
+    if (roles.submitter) out += '<span class="chip">Submitted by me</span>';
+    if (roles.scorer) out += '<span class="chip">Scorer</span>';
+    if (roles.builder) out += '<span class="chip">Builder</span>';
+    return out;
   }
 
   function renderList(items) {
@@ -75,15 +136,25 @@
     items.forEach((it) => {
       const reqId = it["Requirement ID"];
       const status = it["Status"];
-      const isAssignedToMe = (it["Assigned Owner Employee ID"] || "").toString().trim() === myEmployeeId;
+      const roles = it._roles || {};
+      const idArg = escapeHtml(JSON.stringify(reqId)).replace(/&quot;/g, "&quot;");
 
       let actions = "";
-      if (status === "Assigned for scoring" && isAssignedToMe) {
-        actions = '<button style="width:auto; margin:8px 0 0; padding:6px 12px; font-size:13px;" onclick="openScorePanel(\'' + escapeHtml(reqId) + "')\">" + icon("star", 13) + " Submit score</button>";
-      } else if (status === "Scored & assigned" && isAssignedToMe) {
-        actions = '<button style="width:auto; margin:8px 0 0; padding:6px 12px; font-size:13px;" onclick="handleClick(this, function(){return startWork(\'' + escapeHtml(reqId) + "')})\">" + icon("bolt", 13) + " Start work</button>";
-      } else if (status === "In progress" && isAssignedToMe) {
-        actions = '<button style="width:auto; margin:8px 0 0; padding:6px 12px; font-size:13px;" onclick="handleClick(this, function(){return submitForValidation(\'' + escapeHtml(reqId) + "')})\">" + icon("check-circle", 13) + " Submit for validation</button>";
+      let note = "";
+
+      if (roles.scorer && status === "Assigned for scoring") {
+        if (roles.scorerSubmitted) {
+          note = '<div class="subtitle" style="margin:8px 0 0;">' + icon("check-circle", 13) + " You've submitted your score. Waiting for the other scorers.</div>";
+        } else {
+          actions += '<button class="btn-sm" onclick=\'openScorePanel(' + idArg + ")'>" + icon("star", 13) + " Submit score</button>";
+        }
+      }
+      if (roles.builder && status === "Scored & assigned") {
+        actions += '<button class="btn-sm" onclick=\'handleClick(this, function(){return startWork(' + idArg + ")})'>" + icon("bolt", 13) + " Start work</button>";
+      }
+      if (roles.builder && status === "In progress") {
+        actions += '<button class="btn-sm secondary" onclick=\'openUpdatePanel(' + idArg + ")'>" + icon("send", 13) + " Post update</button>";
+        actions += '<button class="btn-sm" onclick=\'openValidatePanel(' + idArg + ")'>" + icon("check-circle", 13) + " Submit for validation</button>";
       }
 
       html +=
@@ -93,59 +164,73 @@
         "<strong>" + escapeHtml(reqId) + "</strong>" + statusBadge(status) +
         (it["Score"] ? '<span class="subtitle" style="margin:0;">Score: ' + escapeHtml(it["Score"]) + " (" + escapeHtml(it["Priority Classification"]) + ")</span>" : "") +
         "</div>" +
+        '<div class="chip-row" style="margin-top:8px;">' + roleChips(roles) + "</div>" +
         renderTracker(status) +
         "<p>" + escapeHtml(it["Process / Activity Description"]) + "</p>" +
         (status === "Rejected" ? '<div class="error" style="margin:8px 0;"><strong>Reason for rejection:</strong> ' + escapeHtml(it["Rejection Reason"] || "No reason was recorded.") + "</div>" : "") +
-        (it["Deadline"] ? "<p class=\"subtitle\">Deadline: " + escapeHtml(it["Deadline"]) + "</p>" : "") +
-        actions +
+        (it["Deadline"] ? '<p class="subtitle">Deadline: ' + escapeHtml(it["Deadline"]) + "</p>" : "") +
+        (roles.builder && status === "Pending validation" ? '<p class="subtitle">Submitted — waiting for the committee to validate.</p>' : "") +
+        note + actions +
         "</div>";
     });
     document.getElementById("list").innerHTML = html;
   }
 
+  // ── Scoring
   function openScorePanel(reqId) {
     currentRequirementId = reqId;
-    document.getElementById("scoreTitle").textContent = "Submit feasibility score — " + reqId;
+    document.getElementById("scoreTitle").textContent = "Feasibility score — " + reqId;
     document.getElementById("scoreMessage").innerHTML = "";
-    let fieldsHtml = "";
+    let h = "";
     SCORE_FACTORS.forEach((f) => {
-      fieldsHtml +=
-        '<label for="sf_' + f.key + '">' + f.label + "</label>" +
-        '<select id="sf_' + f.key + '"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select>';
+      h +=
+        '<div class="factor"><div class="f-name">' + escapeHtml(f.label) + "</div>" +
+        '<div class="f-desc">' + escapeHtml(f.desc) + "</div>" +
+        '<div class="f-scale"><strong>1</strong> = ' + escapeHtml(f.low) + " &nbsp;·&nbsp; <strong>5</strong> = " + escapeHtml(f.high) + "</div>" +
+        '<select id="sf_' + f.key + '"><option value="">Select 1–5…</option>' +
+        '<option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></div>';
     });
-    document.getElementById("scoreFields").innerHTML = fieldsHtml;
+    document.getElementById("scoreFields").innerHTML = h;
     document.getElementById("scorePanel").classList.remove("hidden");
   }
 
-  function closeScorePanel() {
-    document.getElementById("scorePanel").classList.add("hidden");
-  }
+  function closeScorePanel() { document.getElementById("scorePanel").classList.add("hidden"); }
 
   async function submitScore() {
     const scores = {};
-    SCORE_FACTORS.forEach((f) => {
-      scores[f.key] = Number(document.getElementById("sf_" + f.key).value);
-    });
-
+    for (const f of SCORE_FACTORS) {
+      const v = document.getElementById("sf_" + f.key).value;
+      if (!v) {
+        document.getElementById("scoreMessage").innerHTML = '<div class="error">Please score "' + escapeHtml(f.label) + '" too.</div>';
+        return;
+      }
+      scores[f.key] = Number(v);
+    }
     try {
       const data = await apiFetch("/tracker/scoring/submit", {
         method: "POST",
         body: JSON.stringify({ requirementId: currentRequirementId, scores }),
       });
       closeScorePanel();
-      showToast("Score submitted: " + data.score + " (" + data.classification + "). Awaiting committee validation.", "success");
+      if (data.allSubmitted === false) {
+        showToast("Score submitted (" + data.submitted + " of " + data.total + " scorers done). Waiting for the others.", "success");
+      } else {
+        showToast("Score submitted. Average: " + data.score + " (" + data.classification + "). The committee will validate it.", "success");
+      }
       load();
     } catch (err) {
       document.getElementById("scoreMessage").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
     }
   }
 
+  // ── Builder actions
+  async function progress(payload) {
+    return apiFetch("/tracker/requirements/progress", { method: "POST", body: JSON.stringify(payload) });
+  }
+
   async function startWork(reqId) {
     try {
-      await apiFetch("/tracker/requirements/progress", {
-        method: "POST",
-        body: JSON.stringify({ requirementId: reqId, action: "start" }),
-      });
+      await progress({ requirementId: reqId, action: "start" });
       showToast("Marked In Progress — good luck!", "success");
       load();
     } catch (err) {
@@ -153,16 +238,67 @@
     }
   }
 
-  async function submitForValidation(reqId) {
+  function openUpdatePanel(reqId) {
+    currentRequirementId = reqId;
+    document.getElementById("updateTitle").textContent = "Post an update — " + reqId;
+    document.getElementById("updNotes").value = "";
+    document.getElementById("updRef").value = "";
+    document.getElementById("updateMessage").innerHTML = "";
+    document.getElementById("updatePanel").classList.remove("hidden");
+  }
+  function closeUpdatePanel() { document.getElementById("updatePanel").classList.add("hidden"); }
+
+  async function postUpdate() {
+    const notes = document.getElementById("updNotes").value.trim();
+    const reference = document.getElementById("updRef").value.trim();
+    if (!notes && !reference) {
+      document.getElementById("updateMessage").innerHTML = '<div class="error">Add a note or a reference.</div>';
+      return;
+    }
     try {
-      await apiFetch("/tracker/requirements/progress", {
-        method: "POST",
-        body: JSON.stringify({ requirementId: reqId, action: "submit_for_validation" }),
-      });
+      await progress({ requirementId: currentRequirementId, action: "update", notes, reference });
+      closeUpdatePanel();
+      showToast("Update posted.", "success");
+      load();
+    } catch (err) {
+      document.getElementById("updateMessage").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
+    }
+  }
+
+  async function openValidatePanel(reqId) {
+    currentRequirementId = reqId;
+    document.getElementById("validateTitle").textContent = "Submit for validation — " + reqId;
+    document.getElementById("valRef").value = "";
+    document.getElementById("valNotes").value = "";
+    document.getElementById("valAccess").checked = false;
+    document.getElementById("validateMessage").innerHTML = "";
+    document.getElementById("reviewerList").textContent = "Loading…";
+    document.getElementById("validatePanel").classList.remove("hidden");
+    try {
+      const data = await apiFetch("/my-tasks/reviewers");
+      const emails = data.emails || [];
+      document.getElementById("reviewerList").innerHTML = emails.length
+        ? emails.map((e) => "<div>" + icon("mail", 12) + " " + escapeHtml(e) + "</div>").join("")
+        : "No Committee / Management emails found — please check with the committee.";
+    } catch (err) {
+      document.getElementById("reviewerList").textContent = "Couldn't load the list: " + err.message;
+    }
+  }
+  function closeValidatePanel() { document.getElementById("validatePanel").classList.add("hidden"); }
+
+  async function submitForValidation() {
+    const reference = document.getElementById("valRef").value.trim();
+    const notes = document.getElementById("valNotes").value.trim();
+    const msg = document.getElementById("validateMessage");
+    if (!reference) { msg.innerHTML = '<div class="error">Tell the committee where to check the work.</div>'; return; }
+    if (!document.getElementById("valAccess").checked) { msg.innerHTML = '<div class="error">Please tick the box once you\'ve given access.</div>'; return; }
+    try {
+      await progress({ requirementId: currentRequirementId, action: "submit_for_validation", reference, notes, accessConfirmed: true });
+      closeValidatePanel();
       showToast("Submitted for validation — the committee's been notified.", "success");
       load();
     } catch (err) {
-      showToast(err.message, "error");
+      msg.innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
     }
   }
 

@@ -12,6 +12,9 @@ function renderTopbar() {
   const session = requireSession();
   if (!session) return null; // requireSession already redirected to login
 
+  // Pages call load() again after every action - never stack a second bar.
+  document.querySelectorAll(".topbar").forEach((el) => el.remove());
+
   const topbar = document.createElement("div");
   topbar.className = "topbar";
 

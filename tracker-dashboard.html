@@ -92,7 +92,7 @@
 
     const liveCount = byStatus["Live on board"] || 0;
     const needsCommitteeAction =
-      (byStatus["Submitted"] || 0) + (byStatus["Under committee review"] || 0) + (byStatus["Score submitted"] || 0) + (byStatus["Pending validation"] || 0);
+      (byStatus["Submitted"] || 0) + (byStatus["Under committee review"] || 0) + (byStatus["Score submitted"] || 0) + (byStatus["Score validated"] || 0) + (byStatus["Pending validation"] || 0);
 
     renderStats([
       { icon: "clipboard", number: total, label: "Total requirements" },

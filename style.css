@@ -948,3 +948,28 @@ button.theme-toggle.floating {
   background: var(--card); color: var(--text); border: 1px solid var(--border);
 }
 :root[data-theme="dark"] button.theme-toggle.floating { color: var(--amber); }
+
+
+/* v6: new status + task/detail UI */
+.badge-validated { background: rgba(242, 172, 60, 0.18); color: var(--amber-ink); border: 1px solid var(--amber); }
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border-radius: 999px;
+  background: var(--card-alt); border: 1px solid var(--border); font-size: 12px; color: var(--text); }
+.chip button { width: auto; margin: 0; padding: 0 4px; background: transparent; color: var(--text-muted); font-size: 14px; line-height: 1; }
+.chip button:hover { background: transparent; color: var(--error-text); }
+.factor { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.factor:last-child { border-bottom: none; }
+.factor .f-name { font-weight: 600; font-size: 14px; color: var(--text); }
+.factor .f-desc { font-size: 12.5px; color: var(--text-muted); margin: 2px 0 4px; }
+.factor .f-scale { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; }
+.factor select { margin-top: 6px; }
+.detail-grid { display: grid; grid-template-columns: 150px 1fr; gap: 6px 14px; font-size: 13px; }
+.detail-grid .k { color: var(--text-muted); }
+.detail-section { margin-top: 18px; }
+.detail-section h3 { font-family: "Urbanist", sans-serif; font-size: 15px; margin: 0 0 8px; color: var(--text); }
+.update-item { border-left: 3px solid var(--amber); padding: 4px 0 4px 12px; margin: 8px 0; font-size: 13px; }
+.update-item .u-meta { color: var(--text-muted); font-size: 12px; }
+.modal-overlay .card.wide-modal { max-width: 640px; }
+.access-list { background: var(--card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 13px; margin: 8px 0; }
+.check-row { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--text); }
+.check-row input { width: auto; margin-top: 3px; }

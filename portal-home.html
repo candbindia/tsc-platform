@@ -74,7 +74,7 @@
       const boardCount = (board.items || []).length;
       const myItems = tasks.items || [];
       const needsAction = myItems.filter((it) =>
-        ["Assigned for scoring", "Scored & assigned", "In progress"].includes(it["Status"])
+        (it._roles && ((it._roles.scorer && !it._roles.scorerSubmitted && it["Status"] === "Assigned for scoring") || (it._roles.builder && ["Scored & assigned", "In progress"].includes(it["Status"]))))
       ).length;
 
       renderStats([

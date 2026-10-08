@@ -8,13 +8,14 @@ const STATUS_META = {
   "Rejected": { cls: "badge-rejected", step: -1 },
   "Assigned for scoring": { cls: "badge-assigned", step: 1 },
   "Score submitted": { cls: "badge-scored", step: 2 },
+  "Score validated": { cls: "badge-validated", step: 2 },
   "Scored & assigned": { cls: "badge-scored-assigned", step: 2 },
   "In progress": { cls: "badge-progress", step: 3 },
   "Pending validation": { cls: "badge-pending", step: 4 },
   "Live on board": { cls: "badge-live", step: 5 },
 };
 
-const TRACKER_STEPS = ["Submitted", "Assigned", "Scored", "In Progress", "Validation", "Live"];
+const TRACKER_STEPS = ["Submitted", "Scoring", "Scored", "Building", "Validation", "Live"];
 
 // Hex colors matching each badge-* class in style.css, so chart slices and
 // bars read consistently with the badges shown everywhere else.
@@ -24,6 +25,7 @@ const STATUS_COLORS = {
   "Rejected": "#d9534f",
   "Assigned for scoring": "#f2ac3c",
   "Score submitted": "#f2ac3c",
+  "Score validated": "#c98a1a",
   "Scored & assigned": "#f8d65a",
   "In progress": "#d9922a",
   "Pending validation": "#f8d65a",

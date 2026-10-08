@@ -9,22 +9,31 @@
 <script src="theme.js"></script>
 </head>
 <body>
-<div class="page wide">
+<div class="page wide" style="max-width:1200px;">
   <h1>Requirement Register</h1>
-  <p class="subtitle">Every requirement submitted, with its current status. Committee members can act on items below; Management and Admin have view access.</p>
+  <p class="subtitle">Every requirement and where it stands. Everyone here can open <strong>Details</strong>; Committee members also act on items (assign scorers, validate scores, assign the builder, sign off the work).</p>
 
-  <div id="list"></div>
+  <div class="table-wrap" id="list"></div>
   <div id="messageBox"></div>
 </div>
 
-<!-- Action panel (reject / assign for scoring / validate score / validate completion) -->
-<div class="page hidden" id="actionPanel" style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); margin:0; max-width:none; display:flex; align-items:center; justify-content:center; overflow:auto;">
-  <div class="card" style="max-width:480px; width:90%; max-height:85vh; overflow:auto;">
+<!-- Action panel -->
+<div class="modal-overlay hidden" id="actionPanel">
+  <div class="card">
     <h2 id="actionTitle"></h2>
     <div id="actionFields"></div>
-    <button onclick="handleClick(this, submitAction)">Confirm</button>
+    <button onclick="handleClick(this, submitAction)" id="actionConfirm">Confirm</button>
     <button class="secondary" onclick="closeActionPanel()">Cancel</button>
     <div id="actionMessage"></div>
+  </div>
+</div>
+
+<!-- Details panel -->
+<div class="modal-overlay hidden" id="detailPanel">
+  <div class="card wide-modal">
+    <h2 id="detailTitle">Details</h2>
+    <div id="detailBody"><p class="subtitle">Loading…</p></div>
+    <button class="secondary" onclick="closeDetails()">Close</button>
   </div>
 </div>
 
@@ -39,6 +48,9 @@
   let currentReqId = null;
   let currentAction = null;
   let session = null;
+  let items = [];
+  let employeeList = [];
+  let pickedScorers = []; // [{id, name}]
 
   async function load() {
     session = renderTopbar();
@@ -47,7 +59,8 @@
     loadEmployeeList();
     try {
       const data = await apiFetch("/tracker/requirements");
-      renderList(data.items || []);
+      items = data.items || [];
+      renderList();
     } catch (err) {
       showToast(err.message, "error");
     }
@@ -55,7 +68,22 @@
     maybeStartTour(session);
   }
 
-  function renderList(items) {
+  async function loadEmployeeList() {
+    if (session.role !== "Committee") return;
+    try {
+      const data = await apiFetch("/tracker/employees");
+      employeeList = data.employees || [];
+    } catch (err) {
+      /* picking by typing an ID still works */
+    }
+  }
+
+  function shorten(t, n) {
+    t = (t || "").toString();
+    return t.length > n ? t.slice(0, n - 1) + "…" : t;
+  }
+
+  function renderList() {
     if (!items.length) {
       document.getElementById("list").innerHTML = '<p class="subtitle">No requirements submitted yet.</p>';
       return;
@@ -63,54 +91,69 @@
 
     const isCommittee = session.role === "Committee";
 
-    let html = "<table><tr><th>Req ID</th><th>Submitted By</th><th>Dept</th><th>Description</th><th>Status</th><th>Score</th><th>Assigned Owner</th>";
-    if (isCommittee) html += "<th>Actions</th>";
-    html += "</tr>";
+    let html =
+      "<table><tr><th>Req ID</th><th>Submitted By</th><th>Dept</th><th>Description</th><th>Status</th><th>Score</th>" +
+      "<th>Scorers</th><th>Builder</th><th>Deadline</th><th>Actions</th></tr>";
 
     items.forEach((it) => {
       const reqId = it["Requirement ID"];
       const status = it["Status"];
+      const total = Number(it["Scorers Total"] || 0);
+      const done = Number(it["Scorers Submitted"] || 0);
+
+      let scorers = escapeHtml(it["Assigned Owner"] || "");
+      if (scorers && status === "Assigned for scoring" && total) {
+        scorers += '<div class="dim">' + done + " of " + total + " scored</div>";
+      }
+
+      let actions = btn(icon("search", 12) + " Details", "openDetails('" + reqId + "')", true);
+      if (isCommittee) {
+        if (status === "Submitted" || status === "Under committee review") {
+          actions += btn(icon("user-check", 12) + " Assign scorers", "openAssignScorers('" + reqId + "')");
+          actions += btn(icon("x-circle", 12) + " Reject", "openReject('" + reqId + "')");
+        } else if (status === "Assigned for scoring" && done === 0) {
+          actions += btn(icon("user-check", 12) + " Change scorers", "openAssignScorers('" + reqId + "')", true);
+        } else if (status === "Score submitted") {
+          actions += btn(icon("check-circle", 12) + " Validate score", "openValidateScore('" + reqId + "')");
+        } else if (status === "Score validated") {
+          actions += btn(icon("user-check", 12) + " Assign builder", "openAssignBuilder('" + reqId + "')");
+        } else if (status === "Scored & assigned") {
+          actions += btn(icon("user-check", 12) + " Change builder", "openAssignBuilder('" + reqId + "')", true);
+        } else if (status === "Pending validation") {
+          actions += btn(icon("check-circle", 12) + " Validate work", "openValidateCompletion('" + reqId + "')");
+        }
+      }
 
       html +=
         "<tr><td>" + escapeHtml(reqId) + "</td>" +
         "<td>" + escapeHtml(it["Submitted By"]) + "</td>" +
         "<td>" + escapeHtml(it["Department"]) + "</td>" +
-        "<td>" + escapeHtml(it["Process / Activity Description"]) + "</td>" +
+        '<td style="max-width:260px;">' + escapeHtml(shorten(it["Process / Activity Description"], 110)) + "</td>" +
         "<td>" + statusBadge(status) + "</td>" +
         "<td>" + (it["Score"] ? escapeHtml(it["Score"]) + " (" + escapeHtml(it["Priority Classification"]) + ")" : "") + "</td>" +
-        "<td>" + escapeHtml(it["Assigned Owner"]) + "</td>";
-
-      if (isCommittee) {
-        let actions = "";
-        if (status === "Submitted" || status === "Under committee review") {
-          actions +=
-            btn(icon("user-check", 12) + " Assign", "openAssign('" + reqId + "')") +
-            btn(icon("x-circle", 12) + " Reject", "openReject('" + reqId + "')");
-        } else if (status === "Score submitted") {
-          actions += btn(icon("check-circle", 12) + " Validate score", "openValidateScore('" + reqId + "')");
-        } else if (status === "Pending validation") {
-          actions += btn(icon("check-circle", 12) + " Validate", "openValidateCompletion('" + reqId + "')");
-        }
-        html += "<td>" + actions + "</td>";
-      }
-      html += "</tr>";
+        "<td>" + scorers + "</td>" +
+        "<td>" + escapeHtml(it["Builder"] || "") + "</td>" +
+        "<td>" + escapeHtml(it["Deadline"] || "") + "</td>" +
+        "<td>" + actions + "</td></tr>";
     });
     html += "</table>";
     document.getElementById("list").innerHTML = html;
   }
 
-  function btn(labelHtml, onclick) {
-    // labelHtml may contain an icon() call's output, so it is NOT escaped here —
-    // callers only ever pass static text + icon(), never raw user data.
-    return '<button style="width:auto; margin:2px; padding:5px 9px; font-size:12px;" onclick="' + onclick + '">' + labelHtml + "</button>";
+  function btn(labelHtml, onclick, secondary) {
+    // labelHtml only ever holds static text + icon() output, never user data.
+    return '<button class="btn-sm' + (secondary ? " secondary" : "") + '" onclick="' + onclick + '">' + labelHtml + "</button>";
   }
 
-  function openPanel(title, fieldsHtml, action, reqId) {
+  // ───────────── generic action panel ─────────────
+  function openPanel(title, fieldsHtml, action, reqId, confirmLabel) {
     currentAction = action;
     currentReqId = reqId;
     document.getElementById("actionTitle").textContent = title + " — " + reqId;
     document.getElementById("actionFields").innerHTML = fieldsHtml;
     document.getElementById("actionMessage").innerHTML = "";
+    document.getElementById("actionConfirm").innerHTML = confirmLabel || "Confirm";
+    document.getElementById("actionConfirm").dataset.originalText = confirmLabel || "Confirm";
     document.getElementById("actionPanel").classList.remove("hidden");
   }
 
@@ -118,40 +161,138 @@
     document.getElementById("actionPanel").classList.add("hidden");
   }
 
+  function showActionError(msg) {
+    const el = document.getElementById("actionMessage");
+    el.innerHTML = '<div class="error"></div>';
+    el.firstChild.textContent = msg;
+  }
+
+  function employeeOptions() {
+    return employeeList
+      .map((e) => '<option value="' + escapeHtml(e.employeeId) + '">' + escapeHtml(e.name + " — " + e.department) + "</option>")
+      .join("");
+  }
+
+  // Accepts an ID ("CB1102") or an exact name, returns the employee or null.
+  function resolveEmployee(text) {
+    const t = (text || "").trim().toLowerCase();
+    if (!t) return null;
+    return (
+      employeeList.find((e) => e.employeeId.toLowerCase() === t) ||
+      employeeList.find((e) => e.name.toLowerCase() === t) ||
+      null
+    );
+  }
+
   function openReject(reqId) {
-    openPanel(
-      "Reject requirement",
-      '<label for="f_reason">Reason</label><textarea id="f_reason" rows="3"></textarea>',
-      "reject",
-      reqId
-    );
+    openPanel("Reject requirement", '<label for="f_reason">Reason (the submitter will see this)</label><textarea id="f_reason" rows="3"></textarea>', "reject", reqId);
   }
 
-  function openAssign(reqId) {
+  // ───────────── assign scorers (one or many) ─────────────
+  function openAssignScorers(reqId) {
+    const it = items.find((x) => x["Requirement ID"] === reqId) || {};
+    pickedScorers = [];
+    (it["Assigned Owner Employee ID"] || "")
+      .toString()
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .forEach((id) => {
+        const e = employeeList.find((x) => x.employeeId === id);
+        pickedScorers.push({ id, name: e ? e.name : id });
+      });
+
     openPanel(
-      "Assign for scoring",
-      '<label for="f_empId">Employee (type an ID or name, then pick)</label><input type="text" id="f_empId" list="empOptions" autocomplete="off" placeholder="e.g. CB1102 or Asha">' +
+      "Assign scorers",
+      '<p class="subtitle" style="margin-bottom:6px;">Scorers only rate the idea — they are <strong>not</strong> the ones who build it. Add one or more people; the final score is the average of everyone\'s scores.</p>' +
+        '<label for="f_pick">Add an employee (type an ID or name, pick, press Enter)</label>' +
+        '<div style="display:flex; gap:8px;"><input type="text" id="f_pick" list="empOptions" autocomplete="off" placeholder="e.g. CB1102" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addScorer();}">' +
+        '<button type="button" class="secondary" style="width:auto; margin:0; padding:0 16px;" onclick="addScorer()">Add</button></div>' +
         '<datalist id="empOptions">' + employeeOptions() + "</datalist>" +
-        '<p class="subtitle" style="margin:6px 0 0;">They are notified at their work email on file.</p>',
+        '<div class="chip-row" id="scorerChips"></div>' +
+        '<p class="subtitle" style="margin:10px 0 0;">Each scorer is emailed at their work email on file.</p>',
       "assign_for_scoring",
-      reqId
+      reqId,
+      "Assign scorers"
     );
+    renderChips();
   }
 
-  function openValidateScore(reqId) {
+  function addScorer() {
+    const input = document.getElementById("f_pick");
+    const emp = resolveEmployee(input.value);
+    if (!emp) {
+      showActionError("Pick someone from the list (an active employee).");
+      return;
+    }
+    document.getElementById("actionMessage").innerHTML = "";
+    if (!pickedScorers.some((p) => p.id === emp.employeeId)) pickedScorers.push({ id: emp.employeeId, name: emp.name });
+    input.value = "";
+    renderChips();
+  }
+
+  function removeScorer(id) {
+    pickedScorers = pickedScorers.filter((p) => p.id !== id);
+    renderChips();
+  }
+
+  function renderChips() {
+    const el = document.getElementById("scorerChips");
+    if (!el) return;
+    el.innerHTML = pickedScorers.length
+      ? pickedScorers
+          .map((p) => '<span class="chip">' + escapeHtml(p.name) + " (" + escapeHtml(p.id) + ')<button type="button" onclick="removeScorer(\'' + escapeHtml(p.id) + '\')" aria-label="Remove">×</button></span>')
+          .join("")
+      : '<span class="dim" style="font-size:12px;">Nobody added yet.</span>';
+  }
+
+  // ───────────── validate score (no deadline here) ─────────────
+  async function openValidateScore(reqId) {
     openPanel(
       "Validate score",
-      '<label for="f_deadline">Deadline (optional)</label><input type="date" id="f_deadline">',
+      '<div id="vsBody"><p class="subtitle">Loading scores…</p></div>' +
+        '<p class="subtitle" style="margin-top:10px;">Next you\'ll choose who builds it and set the deadline.</p>',
       "validate_score",
-      reqId
+      reqId,
+      "Validate score"
+    );
+    try {
+      const d = await apiFetch("/tracker/requirement?id=" + encodeURIComponent(reqId));
+      const lines = (d.scorers || [])
+        .map((s) => "<div>" + escapeHtml(s.name) + ": <strong>" + escapeHtml(s.score === null ? "—" : s.score) + "</strong></div>")
+        .join("");
+      document.getElementById("vsBody").innerHTML =
+        '<div class="access-list"><div>Average score: <strong>' + escapeHtml(d.item["Score"]) + "</strong> (" + escapeHtml(d.item["Priority Classification"]) + ")</div>" +
+        (lines ? '<div class="dim" style="margin-top:6px;">' + lines + "</div>" : "") + "</div>";
+    } catch (err) {
+      document.getElementById("vsBody").innerHTML = '<p class="subtitle">Couldn\'t load the individual scores — you can still validate.</p>';
+    }
+  }
+
+  // ───────────── assign builder + deadline ─────────────
+  function openAssignBuilder(reqId) {
+    const it = items.find((x) => x["Requirement ID"] === reqId) || {};
+    const today = new Date().toISOString().slice(0, 10);
+    openPanel(
+      "Assign builder",
+      '<p class="subtitle" style="margin-bottom:6px;">The person who will actually build the automation. They\'ll be emailed and can start work from My Tasks.</p>' +
+        '<label for="f_builder">Builder (type an ID or name, then pick)</label>' +
+        '<input type="text" id="f_builder" list="empOptions" autocomplete="off" value="' + escapeHtml(it["Builder Employee ID"] || "") + '" placeholder="e.g. CB1102">' +
+        '<datalist id="empOptions">' + employeeOptions() + "</datalist>" +
+        '<label for="f_deadline">Deadline</label>' +
+        '<input type="date" id="f_deadline" min="' + today + '" value="' + escapeHtml(it["Deadline"] || "") + '">',
+      "assign_builder",
+      reqId,
+      "Assign builder"
     );
   }
 
+  // ───────────── final validation (+ optional catalog) ─────────────
   function openValidateCompletion(reqId) {
     openPanel(
-      "Validate completion",
-      '<p class="subtitle">This marks the item Live and adds it to the Requirement Board.</p>' +
-        '<label style="display:flex; align-items:center; gap:8px; margin-top:12px;"><input type="checkbox" id="f_publish" style="width:auto; margin:0;" onchange="toggleCatalogFields()"> Also list it in the Automation Catalog</label>' +
+      "Validate completed work",
+      '<p class="subtitle">Open <strong>Details</strong> first to check the work (the builder lists where to find it). Confirming marks the item Live and adds it to the Requirement Board.</p>' +
+        '<label class="check-row"><input type="checkbox" id="f_publish" onchange="toggleCatalogFields()"> Also list it in the Automation Catalog</label>' +
         '<div id="catalogFields" class="hidden">' +
         '<label for="f_cname">Automation name</label><input type="text" id="f_cname">' +
         '<label for="f_cdesc">Short description</label><textarea id="f_cdesc" rows="2"></textarea>' +
@@ -160,7 +301,8 @@
         '<div id="f_ownerWrap" class="hidden"><label for="f_cowner">Owner email (requests go here)</label><input type="email" id="f_cowner"></div>' +
         "</div>",
       "validate_completion",
-      reqId
+      reqId,
+      "Mark Live"
     );
   }
 
@@ -172,36 +314,21 @@
     document.getElementById("f_ownerWrap").classList.toggle("hidden", open);
   }
 
-  let employeeList = [];
-  function employeeOptions() {
-    return employeeList
-      .map((e) => '<option value="' + escapeHtml(e.employeeId) + '">' + escapeHtml(e.name + " — " + e.department) + "</option>")
-      .join("");
-  }
-
-  async function loadEmployeeList() {
-    if (session.role !== "Committee") return;
-    try {
-      const data = await apiFetch("/tracker/employees");
-      employeeList = data.employees || [];
-    } catch (err) {
-      /* autocomplete is a convenience; typing an ID still works */
-    }
-  }
-
   async function submitAction() {
     const payload = { requirementId: currentReqId, action: currentAction };
 
     if (currentAction === "reject") {
       payload.rejectionReason = document.getElementById("f_reason").value.trim();
     } else if (currentAction === "assign_for_scoring") {
-      payload.assignedEmployeeId = document.getElementById("f_empId").value.trim();
-      if (!payload.assignedEmployeeId) {
-        document.getElementById("actionMessage").innerHTML = '<div class="error">Employee ID is required.</div>';
-        return;
-      }
-    } else if (currentAction === "validate_score") {
-      payload.deadline = document.getElementById("f_deadline").value;
+      if (!pickedScorers.length) return showActionError("Add at least one scorer.");
+      payload.assignedEmployeeIds = pickedScorers.map((p) => p.id);
+    } else if (currentAction === "assign_builder") {
+      const emp = resolveEmployee(document.getElementById("f_builder").value);
+      if (!emp) return showActionError("Pick the builder from the list (an active employee).");
+      const deadline = document.getElementById("f_deadline").value;
+      if (!deadline) return showActionError("Please set a deadline.");
+      payload.builderEmployeeId = emp.employeeId;
+      payload.deadline = deadline;
     } else if (currentAction === "validate_completion" && document.getElementById("f_publish").checked) {
       const type = document.getElementById("f_ctype").value;
       payload.publishToCatalog = true;
@@ -215,21 +342,103 @@
     }
 
     try {
-      const data = await apiFetch("/tracker/requirements/review", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+      const data = await apiFetch("/tracker/requirements/review", { method: "POST", body: JSON.stringify(payload) });
       closeActionPanel();
       let note = "";
       if (currentAction === "assign_for_scoring") {
-        note = data.notified ? " — " + data.assignedOwner + " was emailed." : " — no email sent (no work email on file for them).";
+        note = " — " + data.emailed + " scorer" + (data.emailed === 1 ? "" : "s") + " emailed";
+        if (data.withoutEmail && data.withoutEmail.length) note += " (no work email on file for " + data.withoutEmail.join(", ") + ")";
+      } else if (currentAction === "assign_builder") {
+        note = data.emailed ? " — " + data.builder + " was emailed." : " — no work email on file for " + data.builder + ", so no email was sent.";
       } else if (data.catalogId) {
-        note = " — added to the Catalog.";
+        note = " — added to the Catalog as " + data.catalogId + ".";
       }
       showToast("Updated: " + data.status + note, "success");
       load();
     } catch (err) {
-      document.getElementById("actionMessage").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
+      showActionError(err.message);
+    }
+  }
+
+  // ───────────── details ─────────────
+  function closeDetails() {
+    document.getElementById("detailPanel").classList.add("hidden");
+  }
+
+  function linkify(text) {
+    const t = (text || "").toString();
+    const safe = escapeHtml(t);
+    return /^https?:\/\/\S+$/i.test(t.trim())
+      ? '<a href="' + safe + '" target="_blank" rel="noopener noreferrer">' + safe + "</a>"
+      : safe;
+  }
+
+  function kv(label, value) {
+    return value ? '<div class="k">' + escapeHtml(label) + "</div><div>" + escapeHtml(value) + "</div>" : "";
+  }
+
+  async function openDetails(reqId) {
+    document.getElementById("detailTitle").textContent = reqId;
+    document.getElementById("detailBody").innerHTML = '<p class="subtitle">Loading…</p>';
+    document.getElementById("detailPanel").classList.remove("hidden");
+    try {
+      const d = await apiFetch("/tracker/requirement?id=" + encodeURIComponent(reqId));
+      const it = d.item;
+
+      let html =
+        '<div style="margin-bottom:8px;">' + statusBadge(it["Status"]) + "</div>" +
+        '<div class="detail-section"><h3>Requirement</h3><div class="detail-grid">' +
+        kv("Submitted by", (it["Submitted By"] || "") + (it["Department"] ? " · " + it["Department"] : "")) +
+        kv("Submitted on", it["Submission Date"]) +
+        kv("Function / area", it["Function / Process Area"]) +
+        kv("Process", it["Process / Activity Description"]) +
+        kv("Current method", it["Current Method"]) +
+        kv("Pain point", it["Pain Point"]) +
+        kv("Frequency", it["Frequency"]) +
+        kv("Manual effort", it["Manual Effort"]) +
+        (it["Status"] === "Rejected" ? kv("Rejection reason", it["Rejection Reason"]) : "") +
+        "</div></div>";
+
+      if ((d.scorers || []).length) {
+        html += '<div class="detail-section"><h3>Scoring</h3>';
+        if (it["Score"]) html += "<div>Average score: <strong>" + escapeHtml(it["Score"]) + "</strong> (" + escapeHtml(it["Priority Classification"]) + ")</div>";
+        d.scorers.forEach((s) => {
+          const sc = (d.scores || []).find((x) => (x["Scorer Employee ID"] || "").toString() === s.employeeId);
+          html += '<div style="margin-top:8px;"><strong>' + escapeHtml(s.name) + "</strong> — " + (s.status === "Submitted" ? "scored " + escapeHtml(s.score) : '<span class="dim">not scored yet</span>');
+          if (sc) {
+            const parts = Object.keys(sc)
+              .filter((k) => /\(1-5\)$/.test(k))
+              .map((k) => escapeHtml(k.replace(" (1-5)", "")) + ": " + escapeHtml(sc[k]));
+            html += '<div class="dim" style="font-size:12px;">' + parts.join(" · ") + "</div>";
+          }
+          html += "</div>";
+        });
+        html += "</div>";
+      }
+
+      if (d.builder && d.builder.name) {
+        html += '<div class="detail-section"><h3>Build</h3><div class="detail-grid">' +
+          kv("Builder", d.builder.name + " (" + d.builder.employeeId + ")") +
+          kv("Deadline", it["Deadline"]) + "</div></div>";
+      }
+
+      if ((d.updates || []).length) {
+        html += '<div class="detail-section"><h3>Work &amp; updates</h3>';
+        d.updates.forEach((u) => {
+          html +=
+            '<div class="update-item"><div class="u-meta">' + escapeHtml(u["Date"]) + " · " + escapeHtml(u["By"]) + " · <strong>" + escapeHtml(u["Type"]) + "</strong></div>" +
+            (u["Notes"] ? "<div>" + escapeHtml(u["Notes"]) + "</div>" : "") +
+            (u["Reference (link / file / tool)"] ? "<div>Where to check: " + linkify(u["Reference (link / file / tool)"]) + "</div>" : "") +
+            (u["Access Shared With"] ? '<div class="u-meta">Access shared with: ' + escapeHtml(u["Access Shared With"]) + "</div>" : "") +
+            "</div>";
+        });
+        html += "</div>";
+      }
+
+      document.getElementById("detailBody").innerHTML = html;
+    } catch (err) {
+      document.getElementById("detailBody").innerHTML = '<div class="error"></div>';
+      document.querySelector("#detailBody .error").textContent = err.message;
     }
   }
 

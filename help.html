@@ -43,18 +43,18 @@
 
   const STEPS = [
     { icon: "plus-circle", title: "1. Submit a requirement", text: "Any employee logs in and submits a manual process worth automating. It's auto-tagged with your name and department — no extra form-filling." },
-    { icon: "user-check", title: "2. Committee review", text: "The Committee reviews every new submission. They either reject it (with a reason you'll see) or assign it to a specific employee to assess feasibility." },
-    { icon: "gauge", title: "3. Feasibility scoring", text: "The assigned employee rates the idea across 10 weighted factors (effort, impact, complexity, and so on). The system computes a weighted score automatically and classifies it High, Medium, or Low priority." },
-    { icon: "check-circle", title: "4. Score validation", text: "The Committee reviews the submitted score, validates it, and can set a deadline for the work." },
-    { icon: "bolt", title: "5. Build", text: "The assigned owner starts work — the item moves to \"In progress\"." },
-    { icon: "send", title: "6. Submit for validation", text: "Once the work is done, the owner submits it back to the Committee for a final check." },
+    { icon: "user-check", title: "2. Committee review", text: "The Committee reviews every new submission. They either reject it (with a reason you'll see) or pick one or more scorers to assess how feasible it is to automate." },
+    { icon: "gauge", title: "3. Feasibility scoring", text: "Each scorer rates the idea across 10 factors (effort, impact, complexity, and so on). Every factor is explained on screen, and for all of them 5 means a better candidate for automation. Scorers only score — they don't build. When everyone has submitted, the system averages the scores and classifies the idea High, Medium, or Low priority." },
+    { icon: "check-circle", title: "4. Score validation", text: "The Committee checks the average score and validates it. Then they choose the one builder and set the deadline." },
+    { icon: "bolt", title: "5. Build", text: "The builder starts work — the item moves to \"In progress\" — and can post updates along the way." },
+    { icon: "send", title: "6. Submit for validation", text: "When the work is done, the builder submits it with a reference (a link, a file update, a tool update — anything that shows the work) and gives the listed Committee and Management members access to it." },
     { icon: "shield", title: "7. Final validation", text: "The Committee confirms it's complete and marks it \"Live on board.\"" },
     { icon: "rocket", title: "8. Live & discoverable", text: "The requirement appears on the Requirement Board for everyone to see. Once deployed, it can also be listed in the Automation Catalog, ready for others to use." },
   ];
 
   const FAQ = [
-    { q: "What happens right after I submit a requirement?", a: "It goes straight to the Committee. They'll either reject it with a reason, or assign a specific person to assess how feasible it is to automate." },
-    { q: "Who assigns the feasibility score, and can anyone do it?", a: "The Committee assigns one specific employee (by Employee ID) to score each item. Only that person can submit the score for it — it's enforced, not just a suggestion." },
+    { q: "What happens right after I submit a requirement?", a: "It goes straight to the Committee. They'll either reject it with a reason, or assign scorers to assess how feasible it is to automate. Your requirement gets an ID like REQ-26-0001." },
+    { q: "Who assigns the feasibility score, and can anyone do it?", a: "The Committee assigns one or more specific employees (by Employee ID) to score each item. Only they can submit scores for it, and the final score is the average of everyone's scores. Scorers are not the builders, although the same person can be both." },
     { q: "What's the difference between the Board and the Catalog?", a: "The Requirement Board shows every requirement and exactly where it stands in the 8-step pipeline. The Automation Catalog lists automations that are already built and live, ready to use today." },
     { q: "What does \"On Request\" mean in the Catalog?", a: "Some automations aren't openly downloadable. Requesting access sends your intended use straight to the owner, who'll reach out to you directly — nothing is handed out unsupervised." },
     { q: "My Employee ID isn't recognized, or I forgot my password — what do I do?", a: "If your Employee ID isn't recognized, check with HR that it's active in the system. First time? We email a 6-digit code to your work email to verify it's you. Forgot your password? Ask a Committee, Management or Admin member to reset it from Manage Accounts — you'll then verify by email code again and choose a new password." },
