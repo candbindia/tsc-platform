@@ -50,6 +50,10 @@ function renderTopbar() {
       '<a href="account.html">Account</a>' +
       '<span class="logout" onclick="logout()">Log out</span>';
   }
+  const here = (location.pathname.split("/").pop() || "index.html").toLowerCase();
+  nav.querySelectorAll("a").forEach((a) => {
+    if ((a.getAttribute("href") || "").toLowerCase() === here) a.classList.add("active");
+  });
   right.appendChild(nav);
   topbar.appendChild(right);
 

@@ -21,13 +21,13 @@ const TRACKER_STEPS = ["Submitted", "Assigned", "Scored", "In Progress", "Valida
 const STATUS_COLORS = {
   "Submitted": "#646767",
   "Under committee review": "#9c9c97",
-  "Rejected": "#ff8d82",
+  "Rejected": "#d9534f",
   "Assigned for scoring": "#f2ac3c",
   "Score submitted": "#f2ac3c",
   "Scored & assigned": "#f8d65a",
   "In progress": "#d9922a",
   "Pending validation": "#f8d65a",
-  "Live on board": "#81c995",
+  "Live on board": "#2e9e5b",
 };
 
 const PRIORITY_COLORS = { High: "#f2ac3c", Medium: "#f8d65a", Low: "#646767" };
