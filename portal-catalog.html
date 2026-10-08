@@ -61,6 +61,14 @@
     }
   }
 
+  // Links typed without https:// would be treated as pages on this site (404) - fix them.
+  function fixLink(v) {
+    let s = (v || "").toString().trim();
+    if (!s) return "";
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(s)) s = "https://" + s.replace(/^\/+/, "");
+    return /^https?:\/\//i.test(s) ? s : "";
+  }
+
   function applyFilter() {
     const q = document.getElementById("searchBox").value.trim().toLowerCase();
     if (!q) return renderList(allItems);
@@ -83,9 +91,10 @@
     items.forEach((it) => {
       const isOpen = (it["Access Type"] || "").trim() === "Open";
       let footer;
-      if (isOpen && it["Access Link / Instructions"]) {
+      const link = fixLink(it["Access Link / Instructions"]);
+      if (isOpen && link) {
         footer =
-          '<a href="' + escapeHtml(it["Access Link / Instructions"]) + '" target="_blank" style="display:inline-flex; align-items:center; gap:6px; font-weight:600; font-size:13px;">' +
+          '<a href="' + escapeHtml(link) + '" rel="noopener" target="_blank" style="display:inline-flex; align-items:center; gap:6px; font-weight:600; font-size:13px;">' +
           icon("external-link", 13) + " Open</a>";
       } else if (isOpen) {
         footer = '<span class="badge">Open</span>';
