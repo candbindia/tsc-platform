@@ -6,6 +6,7 @@
 <title>Dashboard — TSC Tracker</title>
 <link rel="icon" href="favicon.svg">
 <link rel="stylesheet" href="style.css">
+<script src="theme.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
 <body>
@@ -124,11 +125,30 @@
   }
 
   let statusChartInstance, priorityChartInstance;
+  let lastSummary = null;
+
+  // Chart colours follow the active theme (light default, dark opt-in).
+  function chartTheme() {
+    const dark = typeof getTheme === "function" && getTheme() === "dark";
+    return {
+      text: dark ? "#9c9c97" : "#646767",
+      grid: dark ? "#333330" : "#e4e2dc",
+      remap: dark ? { "#d9534f": "#ff8d82", "#2e9e5b": "#81c995" } : {},
+    };
+  }
+
+  window.addEventListener("themechange", function () {
+    if (lastSummary) {
+      try { renderCharts(lastSummary.byStatus, lastSummary.byPriority); } catch (e) {}
+    }
+  });
 
   function renderCharts(byStatus, byPriority) {
+    lastSummary = { byStatus, byPriority };
+    const th = chartTheme();
     const statusLabels = Object.keys(byStatus);
     const statusData = statusLabels.map((s) => byStatus[s]);
-    const statusColors = statusLabels.map((s) => STATUS_COLORS[s] || "#646767");
+    const statusColors = statusLabels.map((s) => { const c = STATUS_COLORS[s] || "#646767"; return th.remap[c] || c; });
 
     const statusCtx = document.getElementById("statusChart");
     if (statusChartInstance) statusChartInstance.destroy();
@@ -139,7 +159,7 @@
         type: "doughnut",
         data: { labels: statusLabels, datasets: [{ data: statusData, backgroundColor: statusColors, borderWidth: 0 }] },
         options: {
-          plugins: { legend: { position: "bottom", labels: { color: "#646767", font: { size: 11 }, padding: 10 } } },
+          plugins: { legend: { position: "bottom", labels: { color: th.text, font: { size: 11 }, padding: 10 } } },
         },
       });
     }
@@ -156,8 +176,8 @@
       options: {
         plugins: { legend: { display: false } },
         scales: {
-          x: { ticks: { color: "#646767" }, grid: { display: false } },
-          y: { ticks: { color: "#646767", precision: 0 }, grid: { color: "#e4e2dc" } },
+          x: { ticks: { color: th.text }, grid: { display: false } },
+          y: { ticks: { color: th.text, precision: 0 }, grid: { color: th.grid } },
         },
       },
     });

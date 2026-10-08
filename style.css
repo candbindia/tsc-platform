@@ -1,5 +1,5 @@
 /* Consulting & Beyond — Technology Spearheads Committee
-   Theme: "Cloudy Pro" (light) — from the C&B Brand Guidelines (v. 2025).
+   Themes: "Cloudy Pro" (light, default) + "Midnight Pro" (dark, opt-in via the toggle) — from the C&B Brand Guidelines (v. 2025).
    Palette: Sunrise Amber #f2ac3c · Golden Hour #f8d65a · Starry White #faf8f3
             Cloudy Grey #646767 · Midnight Ash #111111
    Type: Urbanist (headings) / General Sans (body) */
@@ -9,6 +9,7 @@
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css');
 
 :root {
+  color-scheme: light;
   --amber: #f2ac3c;
   --amber-dark: #d9922a;
   --amber-ink: #8f5a00;   /* readable amber for TEXT on light backgrounds */
@@ -873,3 +874,77 @@ button.secondary .btn-spinner { border-color: rgba(100, 103, 103, 0.3); border-t
 .toast { box-shadow: 0 6px 18px rgba(17, 17, 17, 0.18); }
 .tour-tooltip { box-shadow: 0 8px 24px rgba(17, 17, 17, 0.28); }
 .card, .catalog-card, .kanban-card, .stat-tile, .icon-card { box-shadow: 0 1px 2px rgba(17, 17, 17, 0.04); }
+
+
+/* ═════════════ Midnight Pro (dark) — opt-in via the theme toggle ═════════════
+   Light is the default. theme.js sets <html data-theme="dark"> when a member
+   chooses dark; their choice is remembered in this browser. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --amber-ink: #f2ac3c;
+  --bg: #111111;
+  --card: #1b1b1a;
+  --card-alt: #232321;
+  --border: #333330;
+  --text: #faf8f3;
+  --text-muted: #9c9c97;
+
+  --error-bg: rgba(217, 83, 79, 0.14);
+  --error-text: #ff8d82;
+  --error-border: rgba(217, 83, 79, 0.35);
+
+  --success-bg: rgba(129, 201, 149, 0.14);
+  --success-text: #81c995;
+  --success-border: rgba(129, 201, 149, 0.32);
+}
+
+:root[data-theme="dark"] h1,
+:root[data-theme="dark"] h2 { color: var(--amber); }
+:root[data-theme="dark"] input::placeholder,
+:root[data-theme="dark"] textarea::placeholder { color: #6e6e69; }
+
+:root[data-theme="dark"] button,
+:root[data-theme="dark"] .tab.active,
+:root[data-theme="dark"] .badge-scored,
+:root[data-theme="dark"] .badge-progress { color: #fff; }
+:root[data-theme="dark"] button.secondary { color: var(--amber); border-color: var(--amber); }
+:root[data-theme="dark"] button.secondary:hover { background: rgba(242, 172, 60, 0.1); }
+:root[data-theme="dark"] .btn-spinner { border: 2px solid rgba(255, 255, 255, 0.35); border-top-color: #fff; }
+:root[data-theme="dark"] button.secondary .btn-spinner { border-color: rgba(242, 172, 60, 0.35); border-top-color: var(--amber); }
+:root[data-theme="dark"] .badge-pending { background: rgba(248, 214, 90, 0.18); color: var(--golden); border-color: rgba(248, 214, 90, 0.4); }
+
+:root[data-theme="dark"] .topbar { background: var(--card); border-bottom: 1px solid var(--border); }
+:root[data-theme="dark"] .topbar .brand-logo .brand-mark { color: var(--text); }
+:root[data-theme="dark"] .topbar .brand-logo .brand-sub { color: var(--text-muted); }
+:root[data-theme="dark"] .topbar .who { color: var(--text-muted); }
+:root[data-theme="dark"] .topbar .who strong { color: var(--text); }
+:root[data-theme="dark"] .topbar nav a { color: var(--text-muted); }
+:root[data-theme="dark"] .topbar nav a:hover { color: var(--amber); }
+:root[data-theme="dark"] .topbar nav a.active { color: var(--text); border-bottom-color: var(--amber); }
+:root[data-theme="dark"] .topbar .logout { color: var(--error-text); }
+
+:root[data-theme="dark"] .toast { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45); }
+:root[data-theme="dark"] .tour-tooltip { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55); }
+:root[data-theme="dark"] .card,
+:root[data-theme="dark"] .catalog-card,
+:root[data-theme="dark"] .kanban-card,
+:root[data-theme="dark"] .stat-tile,
+:root[data-theme="dark"] .icon-card { box-shadow: none; }
+
+/* ───────── theme toggle button ───────── */
+button.theme-toggle {
+  width: 34px; height: 34px; margin: 0 0 0 4px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; font-size: 14px;
+  background: rgba(255, 255, 255, 0.14); color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+button.theme-toggle:hover { background: rgba(255, 255, 255, 0.28); }
+:root[data-theme="dark"] button.theme-toggle { background: var(--card-alt); color: var(--amber); border-color: var(--border); }
+:root[data-theme="dark"] button.theme-toggle:hover { background: var(--border); }
+/* on the login page (no top bar) the toggle floats top-right */
+button.theme-toggle.floating {
+  position: fixed; top: 14px; right: 14px; z-index: 40;
+  background: var(--card); color: var(--text); border: 1px solid var(--border);
+}
+:root[data-theme="dark"] button.theme-toggle.floating { color: var(--amber); }

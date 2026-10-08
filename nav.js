@@ -55,6 +55,7 @@ function renderTopbar() {
     if ((a.getAttribute("href") || "").toLowerCase() === here) a.classList.add("active");
   });
   right.appendChild(nav);
+  if (typeof createThemeToggle === "function") right.appendChild(createThemeToggle());
   topbar.appendChild(right);
 
   document.body.insertBefore(topbar, document.body.firstChild);
