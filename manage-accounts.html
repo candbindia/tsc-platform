@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manage Accounts — TSC</title>
+<link rel="icon" href="favicon.svg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page wide">
+  <h1>Manage Accounts</h1>
+  <p class="subtitle">Create and manage Committee, Management and Admin logins, and help employees who are locked out.</p>
+
+  <!-- Create -->
+  <div class="card" style="margin-bottom:20px;">
+    <h2>Create a staff account</h2>
+    <form id="createForm" onsubmit="return handleFormSubmit(event, createAccount);">
+      <div class="form-grid">
+        <div>
+          <label for="cName">Full name</label>
+          <input type="text" id="cName" autocomplete="off">
+        </div>
+        <div>
+          <label for="cEmail">Office email</label>
+          <input type="email" id="cEmail" autocomplete="off">
+        </div>
+        <div>
+          <label for="cRole">Role</label>
+          <select id="cRole"></select>
+        </div>
+        <div></div>
+        <div>
+          <label for="cPass">Password</label>
+          <input type="password" id="cPass" autocomplete="new-password" placeholder="At least 8 characters">
+        </div>
+        <div>
+          <label for="cPass2">Confirm password</label>
+          <input type="password" id="cPass2" autocomplete="new-password">
+        </div>
+      </div>
+      <div class="note-box">This is their <strong>permanent</strong> password — there is no forced change. Share it with them securely; the welcome email does not include it. They can change it any time under <em>Account</em>.</div>
+      <button type="submit" style="width:auto;">Create account</button>
+      <div id="createMessage"></div>
+    </form>
+  </div>
+
+  <!-- Staff list -->
+  <div class="card" style="margin-bottom:20px;">
+    <h2>Staff accounts</h2>
+    <div class="table-wrap" id="staffList"><p class="subtitle">Loading…</p></div>
+  </div>
+
+  <!-- Employees -->
+  <div class="card">
+    <h2>Employee logins</h2>
+    <p class="subtitle">Employees register themselves with an emailed code. If one forgets their password, reset it here — they'll verify by email code again and choose a new one.</p>
+    <input type="text" id="empSearch" placeholder="Search by ID, name or department…" oninput="renderEmployees()" style="max-width:360px;">
+    <div class="table-wrap" id="empList"><p class="subtitle">Loading…</p></div>
+  </div>
+</div>
+
+<!-- Modal: reset staff password -->
+<div class="modal-overlay hidden" id="pwModal">
+  <div class="card">
+    <h2 id="pwTitle">Reset password</h2>
+    <form onsubmit="return handleFormSubmit(event, submitReset);">
+      <label for="rPass">New password</label>
+      <input type="password" id="rPass" autocomplete="new-password" placeholder="At least 8 characters">
+      <label for="rPass2">Confirm new password</label>
+      <input type="password" id="rPass2" autocomplete="new-password">
+      <div class="note-box">This becomes their permanent password. Any lockout on the account is cleared.</div>
+      <button type="submit">Set password</button>
+      <button type="button" class="secondary" onclick="closeModal('pwModal')">Cancel</button>
+      <div id="pwMessage"></div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: change role -->
+<div class="modal-overlay hidden" id="roleModal">
+  <div class="card">
+    <h2 id="roleTitle">Change role</h2>
+    <form onsubmit="return handleFormSubmit(event, submitRole);">
+      <label for="rRole">Role</label>
+      <select id="rRole"></select>
+      <button type="submit">Save role</button>
+      <button type="button" class="secondary" onclick="closeModal('roleModal')">Cancel</button>
+      <div id="roleMessage"></div>
+    </form>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="icons.js"></script>
+<script src="toast.js"></script>
+<script src="nav.js"></script>
+<script>
+  let session = null;
+  let users = [];
+  let employees = [];
+  let targetEmail = null;
+
+  const STAFF_ROLES = ["Committee", "Management", "Admin"];
+
+  function rolesIAmAllowedToGive() {
+    return session.role === "Admin" ? STAFF_ROLES : ["Committee", "Management"];
+  }
+
+  function fillRoleSelect(id, current) {
+    const sel = document.getElementById(id);
+    sel.innerHTML = rolesIAmAllowedToGive()
+      .map((r) => '<option value="' + r + '"' + (r === current ? " selected" : "") + ">" + r + "</option>")
+      .join("");
+  }
+
+  function showMsg(id, text, ok) {
+    const el = document.getElementById(id);
+    el.innerHTML = '<div class="' + (ok ? "success" : "error") + '"></div>';
+    el.firstChild.textContent = text;
+  }
+
+  function closeModal(id) {
+    document.getElementById(id).classList.add("hidden");
+  }
+
+  async function load() {
+    session = renderTopbar();
+    if (!session) return;
+    if (!["Committee", "Management", "Admin"].includes(session.role)) {
+      window.location.href = "portal-home.html";
+      return;
+    }
+    fillRoleSelect("cRole", "Committee");
+    await Promise.all([loadUsers(), loadEmployees()]);
+  }
+
+  // ───────── staff ─────────
+  async function loadUsers() {
+    try {
+      const data = await apiFetch("/admin/users");
+      users = data.users || [];
+      renderUsers();
+    } catch (err) {
+      document.getElementById("staffList").innerHTML = "";
+      showToast(err.message, "error");
+    }
+  }
+
+  function renderUsers() {
+    const me = (decodeToken(session.token) || {}).sub;
+    let html = "<table><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr>";
+    users.forEach((u) => {
+      const isMe = u.email.toLowerCase() === (me || "").toLowerCase();
+      const canTouch = !isMe && (u.role !== "Admin" || session.role === "Admin");
+      const e = escapeHtml(u.email);
+      let actions = "";
+      if (isMe) actions = '<span class="dim">You</span>';
+      else if (!canTouch) actions = '<span class="dim">Admin only</span>';
+      else {
+        actions =
+          '<button class="secondary btn-sm" data-act="reset" data-email="' + e + '">Reset password</button>' +
+          '<button class="secondary btn-sm" data-act="role" data-email="' + e + '">Change role</button>' +
+          (u.status === "Active"
+            ? '<button class="btn-sm btn-danger" data-act="deactivate" data-email="' + e + '">Deactivate</button>'
+            : '<button class="secondary btn-sm" data-act="reactivate" data-email="' + e + '">Reactivate</button>');
+      }
+      html +=
+        "<tr><td>" + escapeHtml(u.name) + "</td><td>" + e + "</td>" +
+        '<td><span class="role-pill ' + escapeHtml(u.role) + '">' + escapeHtml(u.role) + "</span></td>" +
+        "<td>" + (u.status === "Active" ? "Active" : '<span class="dim">Inactive</span>') + "</td>" +
+        "<td class=\"dim\">" + escapeHtml(u.createdDate || "") + "</td>" +
+        "<td>" + actions + "</td></tr>";
+    });
+    html += "</table>";
+    document.getElementById("staffList").innerHTML = html;
+  }
+
+  document.addEventListener("click", function (ev) {
+    const b = ev.target.closest("button[data-act]");
+    if (!b) return;
+    const email = b.dataset.email;
+    const act = b.dataset.act;
+    if (act === "reset") openReset(email);
+    else if (act === "role") openRole(email);
+    else if (act === "deactivate" || act === "reactivate") toggleStatus(b, email, act === "deactivate" ? "Inactive" : "Active");
+    else if (act === "emp-reset") resetEmployee(b, b.dataset.id);
+  });
+
+  async function createAccount() {
+    document.getElementById("createMessage").innerHTML = "";
+    const name = document.getElementById("cName").value.trim();
+    const email = document.getElementById("cEmail").value.trim();
+    const role = document.getElementById("cRole").value;
+    const password = document.getElementById("cPass").value;
+    const confirm = document.getElementById("cPass2").value;
+    if (!name || !email) return showMsg("createMessage", "Enter the person's name and email.");
+    if (password.length < 8) return showMsg("createMessage", "Password must be at least 8 characters.");
+    if (password !== confirm) return showMsg("createMessage", "Passwords don't match.");
+    try {
+      const data = await apiFetch("/admin/users/create", {
+        method: "POST",
+        body: JSON.stringify({ name, email, role, password }),
+      });
+      showToast("Account created for " + data.email + ". Share the password with them securely.", "success");
+      document.getElementById("createForm").reset();
+      await loadUsers();
+    } catch (err) {
+      showMsg("createMessage", err.message);
+    }
+  }
+
+  function openReset(email) {
+    targetEmail = email;
+    document.getElementById("pwTitle").textContent = "Reset password — " + email;
+    document.getElementById("rPass").value = "";
+    document.getElementById("rPass2").value = "";
+    document.getElementById("pwMessage").innerHTML = "";
+    document.getElementById("pwModal").classList.remove("hidden");
+    document.getElementById("rPass").focus();
+  }
+
+  async function submitReset() {
+    const p1 = document.getElementById("rPass").value;
+    const p2 = document.getElementById("rPass2").value;
+    if (p1.length < 8) return showMsg("pwMessage", "Password must be at least 8 characters.");
+    if (p1 !== p2) return showMsg("pwMessage", "Passwords don't match.");
+    try {
+      await apiFetch("/admin/users/reset-password", {
+        method: "POST",
+        body: JSON.stringify({ email: targetEmail, newPassword: p1 }),
+      });
+      closeModal("pwModal");
+      showToast("Password updated for " + targetEmail + ".", "success");
+    } catch (err) {
+      showMsg("pwMessage", err.message);
+    }
+  }
+
+  function openRole(email) {
+    targetEmail = email;
+    const u = users.find((x) => x.email === email);
+    document.getElementById("roleTitle").textContent = "Change role — " + email;
+    // an Admin target keeps "Admin" as an option so the select shows the true value
+    fillRoleSelect("rRole", u ? u.role : "Committee");
+    document.getElementById("roleMessage").innerHTML = "";
+    document.getElementById("roleModal").classList.remove("hidden");
+  }
+
+  async function submitRole() {
+    try {
+      await apiFetch("/admin/users/role", {
+        method: "POST",
+        body: JSON.stringify({ email: targetEmail, role: document.getElementById("rRole").value }),
+      });
+      closeModal("roleModal");
+      showToast("Role updated.", "success");
+      await loadUsers();
+    } catch (err) {
+      showMsg("roleMessage", err.message);
+    }
+  }
+
+  function toggleStatus(btn, email, status) {
+    if (status === "Inactive" && !confirm("Deactivate " + email + "? They'll be logged out and unable to sign in.")) return;
+    handleClick(btn, async function () {
+      try {
+        await apiFetch("/admin/users/status", { method: "POST", body: JSON.stringify({ email, status }) });
+        showToast(status === "Active" ? "Account reactivated." : "Account deactivated.", "success");
+        await loadUsers();
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    });
+  }
+
+  // ───────── employees ─────────
+  async function loadEmployees() {
+    try {
+      const data = await apiFetch("/admin/employees");
+      employees = data.employees || [];
+      renderEmployees();
+    } catch (err) {
+      document.getElementById("empList").innerHTML = "";
+      showToast(err.message, "error");
+    }
+  }
+
+  function renderEmployees() {
+    const q = document.getElementById("empSearch").value.trim().toLowerCase();
+    const list = employees.filter((e) => !q || (e.employeeId + " " + e.name + " " + e.department).toLowerCase().includes(q)).slice(0, 100);
+    if (!list.length) {
+      document.getElementById("empList").innerHTML = '<p class="subtitle">No employees match.</p>';
+      return;
+    }
+    let html = "<table><tr><th>ID</th><th>Name</th><th>Department</th><th>Status</th><th>Login</th><th>Action</th></tr>";
+    list.forEach((e) => {
+      const login = e.registered ? "Password set" : e.hasWorkEmail ? '<span class="dim">Not registered yet</span>' : '<span class="dim">No work email on file</span>';
+      const action = e.registered
+        ? '<button class="secondary btn-sm" data-act="emp-reset" data-id="' + escapeHtml(e.employeeId) + '">Reset password</button>'
+        : "";
+      html +=
+        "<tr><td>" + escapeHtml(e.employeeId) + "</td><td>" + escapeHtml(e.name) + "</td><td>" + escapeHtml(e.department) + "</td>" +
+        "<td>" + (e.status === "Active" ? "Active" : '<span class="dim">' + escapeHtml(e.status) + "</span>") + "</td>" +
+        "<td>" + login + "</td><td>" + action + "</td></tr>";
+    });
+    html += "</table>";
+    if (employees.length > 100 && !q) html += '<p class="subtitle">Showing the first 100 — use search to find others.</p>';
+    document.getElementById("empList").innerHTML = html;
+  }
+
+  function resetEmployee(btn, id) {
+    if (!confirm("Clear the password for " + id + "? They will verify by email code and choose a new one next time they log in.")) return;
+    handleClick(btn, async function () {
+      try {
+        const data = await apiFetch("/admin/employees/reset-password", { method: "POST", body: JSON.stringify({ employeeId: id }) });
+        showToast(
+          data.hasWorkEmail ? "Password cleared. " + id + " can now set a new one." : "Password cleared, but " + id + " has no work email on file — add one in the Employee Master List first.",
+          data.hasWorkEmail ? "success" : "error"
+        );
+        await loadEmployees();
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    });
+  }
+
+  load();
+</script>
+</body>
+</html>

@@ -127,7 +127,7 @@
         body: JSON.stringify({ catalogId: currentCatalogId, intendedUse }),
       });
       closeRequestPanel();
-      showToast("Request sent to " + data.routedTo + " — they'll reach out to you directly.", "success");
+      showToast("Request sent to the owner — they'll reach out to you directly.", "success");
     } catch (err) {
       document.getElementById("requestMessage").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
     }

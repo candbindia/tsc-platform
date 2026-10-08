@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Account — TSC</title>
+<link rel="icon" href="favicon.svg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="content" style="max-width:520px;">
+  <h1>My Account</h1>
+  <p class="subtitle" id="who"></p>
+
+  <div class="card">
+    <h2>Change password</h2>
+    <form onsubmit="return handleFormSubmit(event, changePassword);">
+      <label for="curPass">Current password</label>
+      <input type="password" id="curPass" autocomplete="current-password">
+      <label for="newPass">New password</label>
+      <input type="password" id="newPass" autocomplete="new-password" placeholder="At least 8 characters">
+      <label for="newPass2">Confirm new password</label>
+      <input type="password" id="newPass2" autocomplete="new-password">
+      <button type="submit">Update password</button>
+      <div id="msg"></div>
+    </form>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="icons.js"></script>
+<script src="toast.js"></script>
+<script src="nav.js"></script>
+<script>
+  const session = renderTopbar();
+  if (session) {
+    document.getElementById("who").textContent = session.name + " · " + roleLabel(session.role);
+  }
+
+  function showMsg(text) {
+    const el = document.getElementById("msg");
+    el.innerHTML = '<div class="error"></div>';
+    el.firstChild.textContent = text;
+  }
+
+  async function changePassword() {
+    document.getElementById("msg").innerHTML = "";
+    const currentPassword = document.getElementById("curPass").value;
+    const newPassword = document.getElementById("newPass").value;
+    const confirm = document.getElementById("newPass2").value;
+    if (!currentPassword) return showMsg("Enter your current password.");
+    if (newPassword.length < 8) return showMsg("New password must be at least 8 characters.");
+    if (newPassword !== confirm) return showMsg("New passwords don't match.");
+    try {
+      await apiFetch("/auth/change-password", { method: "POST", body: JSON.stringify({ currentPassword, newPassword }) });
+      showToast("Password updated.", "success");
+      ["curPass", "newPass", "newPass2"].forEach((id) => (document.getElementById(id).value = ""));
+    } catch (err) {
+      showMsg(err.message);
+    }
+  }
+</script>
+</body>
+</html>

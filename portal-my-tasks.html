@@ -94,6 +94,7 @@
         "</div>" +
         renderTracker(status) +
         "<p>" + escapeHtml(it["Process / Activity Description"]) + "</p>" +
+        (status === "Rejected" ? '<div class="error" style="margin:8px 0;"><strong>Reason for rejection:</strong> ' + escapeHtml(it["Rejection Reason"] || "No reason was recorded.") + "</div>" : "") +
         (it["Deadline"] ? "<p class=\"subtitle\">Deadline: " + escapeHtml(it["Deadline"]) + "</p>" : "") +
         actions +
         "</div>";

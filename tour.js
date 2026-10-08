@@ -54,6 +54,11 @@ const TOUR_STEPS_STAFF = [
     title: "Catalog",
     text: "What automations are already live and in use across the org.",
   },
+  {
+    selector: 'a[href="manage-accounts.html"]',
+    title: "Manage Accounts",
+    text: "Create Committee / Management / Admin logins, deactivate them, reset passwords, or help an employee who's locked out.",
+  },
 ];
 
 function maybeStartTour(session) {

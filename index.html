@@ -40,14 +40,24 @@
         <button type="button" class="secondary" onclick="backToStep1()">Back</button>
       </form>
 
-      <form id="empStepRegister" class="hidden" onsubmit="return handleFormSubmit(event, employeeRegisterSubmit);">
+      <form id="empStepRegister" class="hidden" onsubmit="return handleFormSubmit(event, requestCodeSubmit);">
         <div class="step-icon" id="iconStepRegister"></div>
-        <p id="empRegisterGreeting" class="subtitle" style="text-align:center;"></p>
+        <p class="subtitle" style="text-align:center;">First visit! To make sure it's really you, we'll email a 6-digit code to the work email HR has on file for your Employee ID.</p>
+        <button type="submit">Email me a code</button>
+        <button type="button" class="secondary" onclick="backToStep1()">Back</button>
+      </form>
+
+      <form id="empStepVerify" class="hidden" onsubmit="return handleFormSubmit(event, employeeRegisterSubmit);">
+        <div class="step-icon" id="iconStepVerify"></div>
+        <p id="empVerifyGreeting" class="subtitle" style="text-align:center;"></p>
+        <label for="empCode">6-digit code</label>
+        <input type="text" id="empCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="123456">
         <label for="empNewPassword">Create a password</label>
-        <input type="password" id="empNewPassword">
+        <input type="password" id="empNewPassword" autocomplete="new-password" placeholder="At least 8 characters">
         <label for="empConfirmPassword">Confirm password</label>
-        <input type="password" id="empConfirmPassword">
+        <input type="password" id="empConfirmPassword" autocomplete="new-password">
         <button type="submit">Set password &amp; continue</button>
+        <button type="button" class="secondary" onclick="resendCode(this)">Send a new code</button>
         <button type="button" class="secondary" onclick="backToStep1()">Back</button>
       </form>
     </div>
@@ -69,14 +79,16 @@
 <script src="config.js"></script>
 <script src="auth.js"></script>
 <script src="icons.js"></script>
+<script src="toast.js"></script>
 <script>
   document.getElementById("iconStep1").innerHTML = icon("user", 24);
   document.getElementById("iconStepLogin").innerHTML = icon("key", 24);
-  document.getElementById("iconStepRegister").innerHTML = icon("key", 24);
+  document.getElementById("iconStepRegister").innerHTML = icon("mail", 24);
+  document.getElementById("iconStepVerify").innerHTML = icon("key", 24);
   document.getElementById("iconStaff").innerHTML = icon("log-in", 24);
 
   let currentEmployeeId = null;
-  let currentEmployeeInfo = null;
+  let currentTicket = null;
 
   function showTab(which) {
     document.getElementById("tabEmployee").classList.toggle("active", which === "employee");
@@ -87,7 +99,8 @@
   }
 
   function showError(msg) {
-    document.getElementById("messageBox").innerHTML = '<div class="error">' + msg + "</div>";
+    document.getElementById("messageBox").innerHTML = '<div class="error"></div>';
+    document.querySelector("#messageBox .error").textContent = msg;
   }
 
   function clearMessage() {
@@ -98,6 +111,8 @@
     document.getElementById("empStep1").classList.remove("hidden");
     document.getElementById("empStepLogin").classList.add("hidden");
     document.getElementById("empStepRegister").classList.add("hidden");
+    document.getElementById("empStepVerify").classList.add("hidden");
+    currentTicket = null;
     clearMessage();
   }
 
@@ -114,23 +129,19 @@
       });
       const data = await res.json();
 
+      if (!res.ok) return showError(data.error || "Something went wrong.");
       if (!data.valid) {
-        if (data.reason === "inactive") {
-          return showError("This Employee ID is marked inactive. Contact HR.");
-        }
-        return showError("Employee ID not recognized. Contact HR if this seems wrong.");
+        return showError("Employee ID not recognized or not active. Contact HR if this seems wrong.");
       }
 
       currentEmployeeId = employeeId;
-      currentEmployeeInfo = data;
       document.getElementById("empStep1").classList.add("hidden");
 
       if (data.hasPassword) {
-        document.getElementById("empLoginGreeting").textContent = "Welcome back, " + data.name + ".";
+        document.getElementById("empLoginGreeting").textContent = "Welcome back. Enter your password to continue.";
         document.getElementById("empStepLogin").classList.remove("hidden");
+        document.getElementById("empLoginPassword").focus();
       } else {
-        document.getElementById("empRegisterGreeting").textContent =
-          "Welcome, " + data.name + " — looks like this is your first visit. Set a password to continue.";
         document.getElementById("empStepRegister").classList.remove("hidden");
       }
     } catch (err) {
@@ -159,18 +170,60 @@
     }
   }
 
+  async function sendCode() {
+    const res = await fetch(API_BASE + "/auth/employee/request-code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ employeeId: currentEmployeeId }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showError(data.error || "Couldn't send the code.");
+      return false;
+    }
+    currentTicket = data.ticket;
+    document.getElementById("empVerifyGreeting").textContent =
+      "We sent a code to " + data.maskedEmail + ". It's valid for " + data.expiresInMinutes + " minutes.";
+    document.getElementById("empStepRegister").classList.add("hidden");
+    document.getElementById("empStepVerify").classList.remove("hidden");
+    document.getElementById("empCode").focus();
+    return true;
+  }
+
+  async function requestCodeSubmit() {
+    clearMessage();
+    try {
+      await sendCode();
+    } catch (err) {
+      showError("Couldn't reach the server. Try again in a moment.");
+    }
+  }
+
+  function resendCode(btn) {
+    clearMessage();
+    handleClick(btn, async function () {
+      try {
+        if (await sendCode()) showToast("New code sent.", "success");
+      } catch (err) {
+        showError("Couldn't reach the server. Try again in a moment.");
+      }
+    });
+  }
+
   async function employeeRegisterSubmit() {
     clearMessage();
+    const code = document.getElementById("empCode").value.trim();
     const password = document.getElementById("empNewPassword").value;
     const confirm = document.getElementById("empConfirmPassword").value;
-    if (!password || password.length < 6) return showError("Password must be at least 6 characters.");
+    if (!/^\d{6}$/.test(code)) return showError("Enter the 6-digit code from your email.");
+    if (!password || password.length < 8) return showError("Password must be at least 8 characters.");
     if (password !== confirm) return showError("Passwords don't match.");
 
     try {
       const res = await fetch(API_BASE + "/auth/employee/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ employeeId: currentEmployeeId, password }),
+        body: JSON.stringify({ employeeId: currentEmployeeId, ticket: currentTicket, code, password }),
       });
       const data = await res.json();
       if (!res.ok) return showError(data.error || "Couldn't set password.");

@@ -43,6 +43,7 @@
     session = renderTopbar();
     if (!session) return;
 
+    loadEmployeeList();
     try {
       const data = await apiFetch("/tracker/requirements");
       renderList(data.items || []);
@@ -128,8 +129,9 @@
   function openAssign(reqId) {
     openPanel(
       "Assign for scoring",
-      '<label for="f_empId">Employee ID to assign</label><input type="text" id="f_empId" placeholder="e.g. CB1102">' +
-        '<label for="f_email">Their email (for notification)</label><input type="email" id="f_email">',
+      '<label for="f_empId">Employee (type an ID or name, then pick)</label><input type="text" id="f_empId" list="empOptions" autocomplete="off" placeholder="e.g. CB1102 or Asha">' +
+        '<datalist id="empOptions">' + employeeOptions() + "</datalist>" +
+        '<p class="subtitle" style="margin:6px 0 0;">They are notified at their work email on file.</p>',
       "assign_for_scoring",
       reqId
     );
@@ -145,7 +147,45 @@
   }
 
   function openValidateCompletion(reqId) {
-    openPanel("Validate completion", '<p class="subtitle">This marks the item Live on the Requirement Board.</p>', "validate_completion", reqId);
+    openPanel(
+      "Validate completion",
+      '<p class="subtitle">This marks the item Live and adds it to the Requirement Board.</p>' +
+        '<label style="display:flex; align-items:center; gap:8px; margin-top:12px;"><input type="checkbox" id="f_publish" style="width:auto; margin:0;" onchange="toggleCatalogFields()"> Also list it in the Automation Catalog</label>' +
+        '<div id="catalogFields" class="hidden">' +
+        '<label for="f_cname">Automation name</label><input type="text" id="f_cname">' +
+        '<label for="f_cdesc">Short description</label><textarea id="f_cdesc" rows="2"></textarea>' +
+        '<label for="f_ctype">Access type</label><select id="f_ctype" onchange="toggleCatalogFields()"><option value="Open">Open — people can use the link directly</option><option value="On Request">On Request — routed to the owner</option></select>' +
+        '<div id="f_linkWrap"><label for="f_clink">Access link / instructions</label><input type="text" id="f_clink"></div>' +
+        '<div id="f_ownerWrap" class="hidden"><label for="f_cowner">Owner email (requests go here)</label><input type="email" id="f_cowner"></div>' +
+        "</div>",
+      "validate_completion",
+      reqId
+    );
+  }
+
+  function toggleCatalogFields() {
+    const on = document.getElementById("f_publish").checked;
+    document.getElementById("catalogFields").classList.toggle("hidden", !on);
+    const open = document.getElementById("f_ctype").value === "Open";
+    document.getElementById("f_linkWrap").classList.toggle("hidden", !open);
+    document.getElementById("f_ownerWrap").classList.toggle("hidden", open);
+  }
+
+  let employeeList = [];
+  function employeeOptions() {
+    return employeeList
+      .map((e) => '<option value="' + escapeHtml(e.employeeId) + '">' + escapeHtml(e.name + " — " + e.department) + "</option>")
+      .join("");
+  }
+
+  async function loadEmployeeList() {
+    if (session.role !== "Committee") return;
+    try {
+      const data = await apiFetch("/tracker/employees");
+      employeeList = data.employees || [];
+    } catch (err) {
+      /* autocomplete is a convenience; typing an ID still works */
+    }
   }
 
   async function submitAction() {
@@ -155,13 +195,22 @@
       payload.rejectionReason = document.getElementById("f_reason").value.trim();
     } else if (currentAction === "assign_for_scoring") {
       payload.assignedEmployeeId = document.getElementById("f_empId").value.trim();
-      payload.assignedOwnerEmail = document.getElementById("f_email").value.trim();
       if (!payload.assignedEmployeeId) {
         document.getElementById("actionMessage").innerHTML = '<div class="error">Employee ID is required.</div>';
         return;
       }
     } else if (currentAction === "validate_score") {
       payload.deadline = document.getElementById("f_deadline").value;
+    } else if (currentAction === "validate_completion" && document.getElementById("f_publish").checked) {
+      const type = document.getElementById("f_ctype").value;
+      payload.publishToCatalog = true;
+      payload.catalog = {
+        name: document.getElementById("f_cname").value.trim(),
+        description: document.getElementById("f_cdesc").value.trim(),
+        accessType: type,
+        accessLink: type === "Open" ? document.getElementById("f_clink").value.trim() : "",
+        owner: type === "On Request" ? document.getElementById("f_cowner").value.trim() : "",
+      };
     }
 
     try {
@@ -170,7 +219,13 @@
         body: JSON.stringify(payload),
       });
       closeActionPanel();
-      showToast("Updated: " + data.status, "success");
+      let note = "";
+      if (currentAction === "assign_for_scoring") {
+        note = data.notified ? " — " + data.assignedOwner + " was emailed." : " — no email sent (no work email on file for them).";
+      } else if (data.catalogId) {
+        note = " — added to the Catalog.";
+      }
+      showToast("Updated: " + data.status + note, "success");
       load();
     } catch (err) {
       document.getElementById("actionMessage").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";

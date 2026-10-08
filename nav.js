@@ -37,6 +37,7 @@ function renderTopbar() {
       '<a href="portal-submit.html">Submit Requirement</a>' +
       '<a href="portal-my-tasks.html">My Tasks</a>' +
       '<a href="help.html">Help</a>' +
+      '<a href="account.html">Account</a>' +
       '<span class="logout" onclick="logout()">Log out</span>';
   } else {
     nav.innerHTML =
@@ -44,7 +45,9 @@ function renderTopbar() {
       '<a href="tracker-home.html">Requirement Register</a>' +
       '<a href="portal-catalog.html">Catalog</a>' +
       '<a href="portal-board.html">Board</a>' +
+      '<a href="manage-accounts.html">Manage Accounts</a>' +
       '<a href="help.html">Help</a>' +
+      '<a href="account.html">Account</a>' +
       '<span class="logout" onclick="logout()">Log out</span>';
   }
   right.appendChild(nav);
