@@ -1106,3 +1106,12 @@ button.theme-toggle.floating {
 .filter-row select, .filter-row input { width: auto; min-width: 150px; margin: 0; }
 .filter-row input[type="text"], .filter-row input[type="search"] { min-width: 220px; }
 .row-late td:first-child { box-shadow: inset 3px 0 0 var(--error-text); }
+
+/* v9 official logo image */
+.brand-logo .brand-img { height: 38px; width: auto; display: block; }
+.brand-logo.large .brand-img { height: 84px; }
+.topbar .brand-logo .brand-img { height: 40px; }
+.topbar .brand-logo .brand-sub { align-self: flex-end; margin-bottom: 8px; }
+.logo-on-dark { display: none !important; }
+:root[data-theme="dark"] .logo-on-light { display: none !important; }
+:root[data-theme="dark"] .logo-on-dark { display: block !important; }

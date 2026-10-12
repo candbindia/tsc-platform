@@ -73,7 +73,7 @@ function renderTopbar() {
   const logo = document.createElement("a");
   logo.className = "brand-logo";
   logo.href = session.role === "employee" ? "portal-home.html" : "tracker-dashboard.html";
-  logo.innerHTML = '<span class="bar"></span><span class="brand-mark">C&amp;B</span><span class="brand-sub">TSC</span>';
+  logo.innerHTML = '<img class="brand-img" src="logo-light.png" alt="C&amp;B"><span class="brand-sub">TSC</span>';
   topbar.appendChild(logo);
 
   // hamburger (phones)
