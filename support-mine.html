@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Support Requests — TSC</title>
+<link rel="icon" href="favicon.svg">
+<link rel="stylesheet" href="style.css">
+<script src="theme.js"></script>
+</head>
+<body>
+<div class="content">
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+    <div>
+      <h1 style="margin-bottom:4px;">My Support Requests</h1>
+      <p class="subtitle" style="margin-top:0;">Everything you've asked the Technology team for, and where it stands.</p>
+    </div>
+    <a href="support-new.html"><button type="button" style="width:auto; margin:0; padding:9px 16px;">Raise a request</button></a>
+  </div>
+
+  <div id="list"></div>
+</div>
+
+<!-- Detail / conversation -->
+<div class="modal-overlay hidden" id="detailPanel">
+  <div class="card wide-modal">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+      <h2 id="dTitle" style="margin:0;">Support request</h2>
+      <button class="secondary btn-sm" onclick="closeDetail()">Close</button>
+    </div>
+    <div id="dBody"></div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="icons.js"></script>
+<script src="toast.js"></script>
+<script src="nav.js"></script>
+<script src="support.js"></script>
+<script>
+  let currentId = null;
+
+  async function load() {
+    const session = renderTopbar();
+    if (!session) return;
+    if (session.role !== "employee") { location.href = "support-desk.html"; return; }
+    try {
+      const data = await apiFetch("/support/mine");
+      renderList(data.items || []);
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  }
+
+  function renderList(items) {
+    const el = document.getElementById("list");
+    if (!items.length) {
+      el.innerHTML = '<div class="card"><p class="subtitle" style="margin:0;">You haven\'t raised any support requests yet.</p></div>';
+      return;
+    }
+    el.innerHTML = items.map(function (it) {
+      const id = it["Support ID"];
+      const waiting = it["Status"] === "Waiting for requester";
+      return (
+        '<div class="card" style="margin-bottom:16px;">' +
+        '<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">' +
+        "<strong>" + escapeHtml(id) + "</strong>" + supportBadge(it["Status"]) + supportPriorityBadge(it["Priority"]) +
+        '<span class="subtitle" style="margin:0;">' + escapeHtml(it["Category"]) + "</span></div>" +
+        supportFlow(it["Status"]) +
+        '<p style="margin:8px 0 4px;"><strong>' + escapeHtml(it["Title"]) + "</strong></p>" +
+        '<p class="subtitle" style="margin:0 0 8px;">Raised ' + escapeHtml(it["Submission Date"]) +
+        (it["Needed By"] ? " · Needed by " + escapeHtml(it["Needed By"]) : "") +
+        (it["Target Date"] ? " · Target date " + escapeHtml(it["Target Date"]) : "") + "</p>" +
+        (waiting ? '<div class="support-note"><strong>The team is waiting for your reply.</strong> Open the request to answer.</div>' : "") +
+        (it["Status"] === "Declined" ? '<div class="error" style="margin:8px 0;"><strong>Reason:</strong> ' + escapeHtml(it["Decline Reason"] || "No reason was recorded.") + "</div>" : "") +
+        "<button class=\"btn-sm" + (waiting ? "" : " secondary") + '" onclick=\'openDetail(' + JSON.stringify(id).replace(/'/g, "&#39;") + ")'>" + (waiting ? "Reply" : "Open") + "</button>" +
+        "</div>"
+      );
+    }).join("");
+  }
+
+  function closeDetail() { document.getElementById("detailPanel").classList.add("hidden"); load(); }
+
+  async function openDetail(id) {
+    currentId = id;
+    document.getElementById("dTitle").textContent = id;
+    document.getElementById("dBody").innerHTML = "<p class=\"subtitle\">Loading…</p>";
+    document.getElementById("detailPanel").classList.remove("hidden");
+    await refreshDetail();
+  }
+
+  async function refreshDetail() {
+    try {
+      const d = await apiFetch("/support/detail?id=" + encodeURIComponent(currentId));
+      const r = d.request;
+      const status = r["Status"];
+      let html =
+        '<div style="margin:8px 0;">' + supportBadge(status) + " " + supportPriorityBadge(r["Priority"]) + "</div>" +
+        supportFlow(status) +
+        '<div class="detail-grid">' +
+        supportKv("Title", r["Title"]) + supportKv("Category", r["Category"]) +
+        supportKv("What you asked for", r["Description"]) + supportKv("Link / file", r["Reference Link"]) +
+        supportKv("Raised", r["Submission Date"]) + supportKv("Needed by", r["Needed By"]) +
+        supportKv("Target date", r["Target Date"]) + supportKv("Completed on", r["Completion Date"]) +
+        (status === "Declined" ? supportKv("Reason declined", r["Decline Reason"]) : "") +
+        "</div>" +
+        '<div class="detail-section"><h3>Conversation</h3><div class="thread-box">' + supportThreadHtml(d.updates) + "</div></div>";
+
+      if (status === "Completed") {
+        html += d.canReopen
+          ? '<div class="support-note">Still not right? You can reopen this within ' + d.reopenDays + " days of completion.</div>" +
+            '<label for="msg">What is still not right?</label><textarea id="msg" rows="3"></textarea>' +
+            '<button onclick="handleClick(this, reopen)">Reopen request</button>'
+          : '<div class="support-note">This request is completed. If you need something else, please raise a new request.</div>';
+      } else if (status === "Declined") {
+        html += '<div class="support-note">This request was declined. You can raise a new one with more details.</div>';
+      } else {
+        html +=
+          '<label for="msg">' + (status === "Waiting for requester" ? "Your reply" : "Add a comment") + '</label>' +
+          '<textarea id="msg" rows="3" placeholder="' + (status === "Waiting for requester" ? "Answer the team\'s question…" : "Anything to add?") + '"></textarea>' +
+          '<button onclick="handleClick(this, sendComment)">' + (status === "Waiting for requester" ? "Send reply" : "Send comment") + "</button>";
+      }
+      html += '<div id="dMsg"></div>';
+      document.getElementById("dBody").innerHTML = html;
+    } catch (err) {
+      document.getElementById("dBody").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
+    }
+  }
+
+  function dErr(msg) { document.getElementById("dMsg").innerHTML = '<div class="error">' + escapeHtml(msg) + "</div>"; }
+
+  async function sendComment() {
+    const message = document.getElementById("msg").value.trim();
+    if (!message) return dErr("Please write something first.");
+    try {
+      await apiFetch("/support/comment", { method: "POST", body: JSON.stringify({ supportId: currentId, message }) });
+      showToast("Sent.", "success");
+      await refreshDetail();
+    } catch (err) { dErr(err.message); }
+  }
+
+  async function reopen() {
+    const message = document.getElementById("msg").value.trim();
+    if (!message) return dErr("Please tell us what is still not right.");
+    try {
+      await apiFetch("/support/reopen", { method: "POST", body: JSON.stringify({ supportId: currentId, message }) });
+      showToast("Reopened — the team has been notified.", "success");
+      await refreshDetail();
+    } catch (err) { dErr(err.message); }
+  }
+
+  load();
+</script>
+</body>
+</html>

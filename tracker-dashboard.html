@@ -70,7 +70,12 @@
 
     try {
       const data = await apiFetch("/tracker/requirements");
-      renderSummary(data.items || []);
+      let openSupport = null;
+      try {
+        const sup = await apiFetch("/support/desk");
+        openSupport = (sup.items || []).filter((i) => ["New", "In progress", "Waiting for requester"].includes(i["Status"])).length;
+      } catch (e) { /* support tabs not set up yet - skip the tile */ }
+      renderSummary(data.items || [], openSupport);
     } catch (err) {
       showToast(err.message, "error");
     }
@@ -78,7 +83,7 @@
     maybeStartTour(session);
   }
 
-  function renderSummary(items) {
+  function renderSummary(items, openSupport) {
     const total = items.length;
     const byStatus = {};
     const byPriority = { High: 0, Medium: 0, Low: 0 };
@@ -99,7 +104,7 @@
       { icon: "user-check", number: needsCommitteeAction, label: "Awaiting committee action" },
       { icon: "check-circle", number: liveCount, label: "Live on board" },
       { icon: "trending-up", number: byPriority.High, label: "High priority (scored)" },
-    ]);
+    ].concat(openSupport === null ? [] : [{ icon: "lifebuoy", number: openSupport, label: "Open support requests" }]));
 
     try {
       renderCharts(byStatus, byPriority);

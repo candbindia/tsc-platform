@@ -47,6 +47,8 @@ const ICON_MAP = {
   star: "fa-star",
   scale: "fa-scale-balanced",
   gauge: "fa-gauge-high",
+  lifebuoy: "fa-life-ring",
+  reply: "fa-reply",
 };
 
 function icon(name, size) {

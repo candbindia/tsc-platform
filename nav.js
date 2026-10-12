@@ -19,6 +19,10 @@ function navItemsFor(role) {
         { label: "Requirement Board", href: "portal-board.html" },
       ] },
       { label: "My Tasks", href: "portal-my-tasks.html" },
+      { label: "Support", group: [
+        { label: "Raise a Support Request", href: "support-new.html" },
+        { label: "My Support Requests", href: "support-mine.html" },
+      ] },
       { label: "Help", href: "help.html" },
     ];
   }
@@ -29,6 +33,7 @@ function navItemsFor(role) {
       { label: "Requirement Board", href: "portal-board.html" },
     ] },
     { label: "Catalog", href: "portal-catalog.html" },
+    { label: "Support Desk", href: "support-desk.html" },
     { label: "Admin", group: [
       { label: "Manage Accounts", href: "manage-accounts.html" },
     ] },

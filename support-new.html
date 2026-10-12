@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Raise a Support Request — TSC</title>
+<link rel="icon" href="favicon.svg">
+<link rel="stylesheet" href="style.css">
+<script src="theme.js"></script>
+</head>
+<body>
+<div class="content">
+  <div style="display:flex; align-items:center; gap:12px; margin-bottom:4px;">
+    <div class="ic" id="icHeader" style="width:36px; height:36px;"></div>
+    <h1 style="margin:0;">Raise a Support Request</h1>
+  </div>
+  <p class="subtitle">Need help from the Technology team — a change to a Sheet or tool, a report, something not working? Tell us here and follow it under <a href="support-mine.html">My support requests</a>. (Got an idea to <em>automate</em> a process? Use <a href="portal-submit.html">Submit a Requirement</a> instead.)</p>
+
+  <form class="card" style="max-width:600px;" onsubmit="return handleFormSubmit(event, submitSupport);">
+    <label for="category">What kind of request is it? *</label>
+    <select id="category">
+      <option value="">Select...</option>
+      <option>Sheet or tool change</option>
+      <option>New report or dashboard</option>
+      <option>Something not working</option>
+      <option>Access or login</option>
+      <option>Training or help</option>
+      <option>Other</option>
+    </select>
+
+    <label for="title">Short title *</label>
+    <input type="text" id="title" maxlength="120" placeholder="e.g. Add a Status column to the attendance sheet">
+
+    <label for="description">What do you need? *</label>
+    <textarea id="description" rows="5" placeholder="Describe what you need, what you see today, and what you'd like instead"></textarea>
+
+    <label for="reference">Link or name of the file / Sheet / tool (optional)</label>
+    <input type="text" id="reference" placeholder="e.g. a Google Sheet link, or the tool's name">
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div>
+        <label for="priority">Priority</label>
+        <select id="priority">
+          <option>Low</option>
+          <option selected>Normal</option>
+          <option>Urgent</option>
+        </select>
+      </div>
+      <div>
+        <label for="neededBy">Needed by (optional)</label>
+        <input type="date" id="neededBy">
+      </div>
+    </div>
+
+    <button type="submit">Send request</button>
+    <div id="messageBox"></div>
+  </form>
+
+  <div class="card hidden" id="doneCard" style="max-width:600px; margin-top:16px;">
+    <h2 style="margin-top:0;">Request sent</h2>
+    <p>Your reference is <strong id="doneId"></strong>. We've emailed you a confirmation. You'll get an email if we need anything from you, and again when it's done.</p>
+    <a href="support-mine.html"><button type="button" class="secondary" style="width:auto; padding:8px 16px;">Go to My support requests</button></a>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="icons.js"></script>
+<script src="toast.js"></script>
+<script src="nav.js"></script>
+<script>
+  const session = renderTopbar();
+  if (session && session.role !== "employee") {
+    location.href = "support-desk.html";
+  }
+  document.getElementById("icHeader").innerHTML = icon("lifebuoy", 20);
+  document.getElementById("neededBy").min = new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+
+  async function submitSupport() {
+    const box = document.getElementById("messageBox");
+    box.innerHTML = "";
+    const payload = {
+      category: document.getElementById("category").value,
+      title: document.getElementById("title").value.trim(),
+      description: document.getElementById("description").value.trim(),
+      reference: document.getElementById("reference").value.trim(),
+      priority: document.getElementById("priority").value,
+      neededBy: document.getElementById("neededBy").value,
+    };
+    if (!payload.category) { box.innerHTML = '<div class="error">Please choose a category.</div>'; return; }
+    if (!payload.title) { box.innerHTML = '<div class="error">Please give the request a short title.</div>'; return; }
+    if (!payload.description) { box.innerHTML = '<div class="error">Please describe what you need.</div>'; return; }
+
+    try {
+      const data = await apiFetch("/support/submit", { method: "POST", body: JSON.stringify(payload) });
+      showToast("Sent — reference " + data.supportId + ".", "success");
+      document.getElementById("doneId").textContent = data.supportId;
+      document.getElementById("doneCard").classList.remove("hidden");
+      ["category", "title", "description", "reference", "neededBy"].forEach(function (id) { document.getElementById(id).value = ""; });
+      document.getElementById("priority").value = "Normal";
+    } catch (err) {
+      box.innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
+    }
+  }
+</script>
+</body>
+</html>

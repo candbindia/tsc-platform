@@ -44,6 +44,13 @@
         <div class="ic-desc">Things you've submitted, or been assigned to score/build.</div>
       </div>
     </a>
+    <a class="icon-card" href="support-new.html">
+      <div class="ic" id="icSupport"></div>
+      <div>
+        <div class="ic-title">Technology Support</div>
+        <div class="ic-desc">Need help from the Technology team? Raise a request and follow it here.</div>
+      </div>
+    </a>
   </div>
 </div>
 
@@ -57,6 +64,7 @@
   document.getElementById("icBoard").innerHTML = icon("layers", 22);
   document.getElementById("icSubmit").innerHTML = icon("plus-circle", 22);
   document.getElementById("icTasks").innerHTML = icon("check-square", 22);
+  document.getElementById("icSupport").innerHTML = icon("lifebuoy", 22);
 
   async function load() {
     const session = renderTopbar();

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Support Desk — TSC</title>
+<link rel="icon" href="favicon.svg">
+<link rel="stylesheet" href="style.css">
+<script src="theme.js"></script>
+<style>#tableWrap table { margin: 0; }</style>
+</head>
+<body>
+<div class="content">
+  <h1>Support Desk</h1>
+  <p class="subtitle" id="deskSub">General requests to the Technology team.</p>
+
+  <div class="stat-grid" id="tiles"></div>
+
+  <div class="filter-row">
+    <select id="fStatus" onchange="render()">
+      <option value="">All statuses</option>
+      <option value="__open">Open (not finished)</option>
+      <option>New</option>
+      <option>In progress</option>
+      <option>Waiting for requester</option>
+      <option>Completed</option>
+      <option>Declined</option>
+    </select>
+    <select id="fCategory" onchange="render()"><option value="">All categories</option></select>
+    <select id="fPriority" onchange="render()">
+      <option value="">All priorities</option>
+      <option>Urgent</option><option>Normal</option><option>Low</option>
+    </select>
+    <input type="search" id="fSearch" placeholder="Search ID, name, title…" oninput="render()">
+  </div>
+
+  <div class="card" style="padding:0; overflow:auto;" id="tableWrap"></div>
+</div>
+
+<!-- Detail / actions -->
+<div class="modal-overlay hidden" id="detailPanel">
+  <div class="card wide-modal">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+      <h2 id="dTitle" style="margin:0;">Support request</h2>
+      <button class="secondary btn-sm" onclick="closeDetail()">Close</button>
+    </div>
+    <div id="dBody"></div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="icons.js"></script>
+<script src="toast.js"></script>
+<script src="nav.js"></script>
+<script src="support.js"></script>
+<script>
+  let items = [];
+  let role = "";
+  let currentId = null;
+  const OPEN = ["New", "In progress", "Waiting for requester"];
+
+  async function load() {
+    const session = renderTopbar();
+    if (!session) return;
+    role = session.role;
+    if (role === "employee") { location.href = "support-mine.html"; return; }
+    document.getElementById("deskSub").textContent =
+      role === "Committee"
+        ? "General requests to the Technology team. Pick them up, ask the requester questions, and close them out."
+        : "General requests to the Technology team. You can read everything and leave team-only notes for the Committee.";
+    try {
+      const data = await apiFetch("/support/desk");
+      items = data.items || [];
+      const cats = document.getElementById("fCategory");
+      if (cats.options.length === 1) {
+        (data.categories || []).forEach(function (c) {
+          const o = document.createElement("option"); o.textContent = c; cats.appendChild(o);
+        });
+      }
+      render();
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  }
+
+  function dueOf(it) { return it["Target Date"] || it["Needed By"] || ""; }
+  function isLate(it) {
+    const d = dueOf(it);
+    return OPEN.includes(it["Status"]) && d && d < supportToday();
+  }
+
+  function tiles() {
+    const month = supportToday().slice(0, 7);
+    const open = items.filter((i) => OPEN.includes(i["Status"]));
+    const t = [
+      { icon: "inbox", number: open.length, label: "Open requests" },
+      { icon: "sparkle", number: items.filter((i) => i["Status"] === "New").length, label: "New (not picked up)" },
+      { icon: "hourglass", number: items.filter((i) => i["Status"] === "Waiting for requester").length, label: "Waiting for requester" },
+      { icon: "warning", number: items.filter(isLate).length, label: "Overdue" },
+      { icon: "check-circle", number: items.filter((i) => i["Status"] === "Completed" && (i["Completion Date"] || "").startsWith(month)).length, label: "Completed this month" },
+    ];
+    document.getElementById("tiles").innerHTML = t.map(function (s) {
+      return '<div class="stat-tile"><div class="stat-icon">' + icon(s.icon, 20) + '</div><div><div class="stat-number">' + s.number +
+        '</div><div class="stat-label">' + escapeHtml(s.label) + "</div></div></div>";
+    }).join("");
+  }
+
+  function filtered() {
+    const st = document.getElementById("fStatus").value;
+    const cat = document.getElementById("fCategory").value;
+    const pr = document.getElementById("fPriority").value;
+    const q = document.getElementById("fSearch").value.trim().toLowerCase();
+    return items.filter(function (i) {
+      if (st === "__open" && !OPEN.includes(i["Status"])) return false;
+      if (st && st !== "__open" && i["Status"] !== st) return false;
+      if (cat && i["Category"] !== cat) return false;
+      if (pr && i["Priority"] !== pr) return false;
+      if (q && !(i["Support ID"] + " " + i["Submitted By"] + " " + i["Title"] + " " + i["Department"]).toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }
+
+  function render() {
+    tiles();
+    const list = filtered();
+    if (!list.length) {
+      document.getElementById("tableWrap").innerHTML = '<p class="subtitle" style="padding:16px; margin:0;">No support requests match.</p>';
+      return;
+    }
+    let h = "<table><tr><th>ID</th><th>Requester</th><th>Category</th><th>Title</th><th>Priority</th><th>Status</th><th>Days open</th><th>Due</th><th></th></tr>";
+    list.forEach(function (it) {
+      const id = it["Support ID"];
+      h +=
+        '<tr class="' + (isLate(it) ? "row-late" : "") + '">' +
+        "<td>" + escapeHtml(id) + "</td>" +
+        "<td>" + escapeHtml(it["Submitted By"]) + '<div class="subtitle" style="margin:0; font-size:12px;">' + escapeHtml(it["Department"]) + "</div></td>" +
+        "<td>" + escapeHtml(it["Category"]) + "</td>" +
+        "<td>" + escapeHtml(it["Title"]) + "</td>" +
+        "<td>" + supportPriorityBadge(it["Priority"]) + "</td>" +
+        "<td>" + supportBadge(it["Status"]) + "</td>" +
+        "<td>" + escapeHtml(supportDaysOpen(it)) + "</td>" +
+        "<td>" + escapeHtml(dueOf(it) || "—") + "</td>" +
+        '<td><button class="btn-sm" onclick=\'openDetail(' + JSON.stringify(id) + ")'>Open</button></td></tr>";
+    });
+    document.getElementById("tableWrap").innerHTML = h + "</table>";
+  }
+
+  function closeDetail() { document.getElementById("detailPanel").classList.add("hidden"); load(); }
+
+  async function openDetail(id) {
+    currentId = id;
+    document.getElementById("dTitle").textContent = id;
+    document.getElementById("dBody").innerHTML = '<p class="subtitle">Loading…</p>';
+    document.getElementById("detailPanel").classList.remove("hidden");
+    await refreshDetail();
+  }
+
+  async function refreshDetail() {
+    try {
+      const d = await apiFetch("/support/detail?id=" + encodeURIComponent(currentId));
+      const r = d.request;
+      const status = r["Status"];
+      const open = OPEN.includes(status);
+      let html =
+        '<div style="margin:8px 0;">' + supportBadge(status) + " " + supportPriorityBadge(r["Priority"]) + "</div>" +
+        supportFlow(status) +
+        '<div class="detail-grid">' +
+        supportKv("Requester", r["Submitted By"] + " (" + r["Employee ID"] + ")") + supportKv("Department", r["Department"]) +
+        supportKv("Email", r["Submitter Email"]) + supportKv("Category", r["Category"]) +
+        supportKv("Title", r["Title"]) + supportKv("Description", r["Description"]) +
+        supportKv("Link / file", r["Reference Link"]) + supportKv("Raised", r["Submission Date"]) +
+        supportKv("Needed by", r["Needed By"]) + supportKv("Target date", r["Target Date"]) +
+        supportKv("Completed on", r["Completion Date"]) + supportKv("Reopened", Number(r["Reopen Count"]) ? r["Reopen Count"] + " time(s)" : "") +
+        (status === "Declined" ? supportKv("Reason declined", r["Decline Reason"]) : "") +
+        "</div>" +
+        '<div class="detail-section"><h3>Conversation &amp; history</h3><div class="thread-box">' + supportThreadHtml(d.updates) + "</div></div>";
+
+      if (role === "Committee") {
+        html += '<label for="msg">Message</label><textarea id="msg" rows="3" placeholder="Write to the requester, or a team-only note…"></textarea><div class="support-actions">';
+        if (open) {
+          if (status === "New") html += btn("Pick up", "start", "");
+          html += btn("Ask requester", "ask", "secondary") + btn("Mark completed", "complete", "") + btn("Decline", "decline", "secondary");
+        }
+        html += '<button class="btn-sm secondary" onclick="handleClick(this, function(){return comment(false)})">Reply to requester</button>' +
+          '<button class="btn-sm secondary" onclick="handleClick(this, function(){return comment(true)})">Add team-only note</button></div>';
+        if (open) {
+          html += '<div style="display:flex; gap:8px; align-items:center; margin-top:12px; flex-wrap:wrap;">' +
+            '<label for="due" style="margin:0;">Target date</label><input type="date" id="due" value="' + escapeHtml(r["Target Date"] || "") + '" style="width:auto; margin:0;">' +
+            '<button class="btn-sm secondary" onclick="handleClick(this, setDue)">Save date</button></div>';
+        }
+      } else if (role === "Management") {
+        html += '<label for="msg">Team-only note</label><textarea id="msg" rows="3" placeholder="Visible to the Committee and Management — not to the requester"></textarea>' +
+          '<div class="support-actions"><button class="btn-sm" onclick="handleClick(this, function(){return comment(true)})">Add note</button></div>';
+      }
+      html += '<div id="dMsg"></div>';
+      document.getElementById("dBody").innerHTML = html;
+    } catch (err) {
+      document.getElementById("dBody").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
+    }
+  }
+
+  function btn(label, action, cls) {
+    return '<button class="btn-sm ' + cls + '" onclick="handleClick(this, function(){return act(\'' + action + '\')})">' + label + "</button>";
+  }
+
+  function dErr(msg) { document.getElementById("dMsg").innerHTML = '<div class="error">' + escapeHtml(msg) + "</div>"; }
+
+  async function act(action) {
+    const message = document.getElementById("msg").value.trim();
+    if (["ask", "decline"].includes(action) && !message) {
+      return dErr(action === "ask" ? "Write the question for the requester first." : "Write the reason for declining first.");
+    }
+    try {
+      await apiFetch("/support/action", { method: "POST", body: JSON.stringify({ supportId: currentId, action, message }) });
+      showToast("Done.", "success");
+      await refreshDetail();
+    } catch (err) { dErr(err.message); }
+  }
+
+  async function comment(internal) {
+    const message = document.getElementById("msg").value.trim();
+    if (!message) return dErr("Please write something first.");
+    try {
+      await apiFetch("/support/comment", { method: "POST", body: JSON.stringify({ supportId: currentId, message, internal }) });
+      showToast(internal ? "Team note added." : "Sent to the requester.", "success");
+      await refreshDetail();
+    } catch (err) { dErr(err.message); }
+  }
+
+  async function setDue() {
+    try {
+      await apiFetch("/support/action", { method: "POST", body: JSON.stringify({ supportId: currentId, action: "set_due", dueDate: document.getElementById("due").value }) });
+      showToast("Target date saved.", "success");
+      await refreshDetail();
+    } catch (err) { dErr(err.message); }
+  }
+
+  load();
+</script>
+</body>
+</html>
