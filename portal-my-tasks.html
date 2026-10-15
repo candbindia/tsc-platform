@@ -51,6 +51,11 @@
     <p class="subtitle">Tell the committee where to check your work. It can be a link, a file update, a tool update — anything.</p>
     <label for="valRef">Where can they check it? <span style="color:var(--danger, #c0392b);">*</span></label>
     <input type="text" id="valRef" placeholder="e.g. link to the sheet/tool, or &quot;Updated file on shared drive: Reports/Q3.xlsx&quot;">
+    <label for="valTech">Technical file link <span style="color:var(--danger, #c0392b);">*</span></label>
+    <input type="text" id="valTech" placeholder="Working link to the technical file (full link, https://…)">
+    <label for="valFinal">Final documentation note <span style="color:var(--danger, #c0392b);">*</span></label>
+    <textarea id="valFinal" rows="3" placeholder="What was built, where it is stored, and how to maintain it"></textarea>
+    <p class="dim" style="font-size:12px;margin:-4px 0 10px;">Required by the Technology Support protocol — the work can't be closed without a working link.</p>
     <label for="valNotes">Notes (optional)</label>
     <textarea id="valNotes" rows="3" placeholder="Anything the reviewers should know"></textarea>
     <div class="access-list">
@@ -270,6 +275,8 @@
     document.getElementById("validateTitle").textContent = "Submit for validation — " + reqId;
     document.getElementById("valRef").value = "";
     document.getElementById("valNotes").value = "";
+    document.getElementById("valTech").value = "";
+    document.getElementById("valFinal").value = "";
     document.getElementById("valAccess").checked = false;
     document.getElementById("validateMessage").innerHTML = "";
     document.getElementById("reviewerList").textContent = "Loading…";
@@ -291,9 +298,13 @@
     const notes = document.getElementById("valNotes").value.trim();
     const msg = document.getElementById("validateMessage");
     if (!reference) { msg.innerHTML = '<div class="error">Tell the committee where to check the work.</div>'; return; }
+    const technicalLink = document.getElementById("valTech").value.trim();
+    const finalNote = document.getElementById("valFinal").value.trim();
+    if (!technicalLink) { msg.innerHTML = '<div class="error">Add the working link to the technical file.</div>'; return; }
+    if (finalNote.length < 10) { msg.innerHTML = '<div class="error">Add a short final documentation note (what was built, where it is stored, how to maintain it).</div>'; return; }
     if (!document.getElementById("valAccess").checked) { msg.innerHTML = '<div class="error">Please tick the box once you\'ve given access.</div>'; return; }
     try {
-      await progress({ requirementId: currentRequirementId, action: "submit_for_validation", reference, notes, accessConfirmed: true });
+      await progress({ requirementId: currentRequirementId, action: "submit_for_validation", reference, notes, technicalLink, finalNote, accessConfirmed: true });
       closeValidatePanel();
       showToast("Submitted for validation — the committee's been notified.", "success");
       load();

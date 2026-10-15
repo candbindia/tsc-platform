@@ -81,6 +81,8 @@
     renderList(filtered);
   }
 
+  const isStaff = (getSession() || {}).role !== "employee";
+
   function renderList(items) {
     if (!items.length) {
       document.getElementById("list").innerHTML = '<p class="subtitle">Nothing matches yet.</p>';
@@ -105,13 +107,20 @@
           icon("send", 13) + " Request</button>";
       }
 
+      let tech = "";
+      if (isStaff) {
+        const tl = fixLink(it["Technical File Link"]);
+        tech = tl
+          ? '<div class="cc-tech"><a href="' + escapeHtml(tl) + '" rel="noopener" target="_blank">' + icon("external-link", 11) + " Technical file</a></div>"
+          : '<div class="cc-tech missing">' + icon("warning", 11) + " Documentation missing</div>";
+      }
       html +=
         '<div class="catalog-card">' +
         '<div class="cc-icon">' + icon("bolt", 20) + "</div>" +
         '<div class="cc-title">' + escapeHtml(it["Automation Name"]) + "</div>" +
         '<div class="cc-dept">' + icon("building", 11) + " " + escapeHtml(it["Department / Function"]) + "</div>" +
         '<div class="cc-desc">' + escapeHtml(it["Description"]) + "</div>" +
-        '<div class="cc-footer"><span class="badge">' + escapeHtml(it["Status"]) + "</span>" + footer + "</div>" +
+        '<div class="cc-footer"><span class="badge">' + escapeHtml(it["Status"]) + "</span>" + footer + "</div>" + tech +
         "</div>";
     });
     document.getElementById("list").innerHTML = html;

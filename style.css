@@ -1115,3 +1115,8 @@ button.theme-toggle.floating {
 .logo-on-dark { display: none !important; }
 :root[data-theme="dark"] .logo-on-light { display: none !important; }
 :root[data-theme="dark"] .logo-on-dark { display: block !important; }
+
+/* v9 technical documentation on catalog cards (staff only) */
+.catalog-card .cc-tech { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); font-size: 12.5px; }
+.catalog-card .cc-tech a { font-weight: 600; }
+.catalog-card .cc-tech.missing { color: var(--error-text, #b3261e); font-weight: 600; }

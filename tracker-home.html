@@ -292,6 +292,10 @@
     openPanel(
       "Validate completed work",
       '<p class="subtitle">Open <strong>Details</strong> first to check the work (the builder lists where to find it). Confirming marks the item Live and adds it to the Requirement Board.</p>' +
+        '<div class="detail-section" style="margin:12px 0;"><h3>Technical documentation (required)</h3>' +
+        '<label for="f_tech">Technical file link</label><input type="text" id="f_tech" placeholder="Working link to the technical file (https://…)">' +
+        '<label for="f_final">Final documentation note</label><textarea id="f_final" rows="3" placeholder="What was built, where it is stored, how to maintain it"></textarea>' +
+        '<p class="dim" style="font-size:12px;margin:4px 0 0;">The builder fills this in when submitting. Open the link to check it works. You can correct it here. Marking Live is blocked without it.</p></div>' +
         '<label class="check-row"><input type="checkbox" id="f_publish" onchange="toggleCatalogFields()"> Also list it in the Automation Catalog</label>' +
         '<div id="catalogFields" class="hidden">' +
         '<label for="f_cname">Automation name</label><input type="text" id="f_cname">' +
@@ -304,6 +308,13 @@
       reqId,
       "Mark Live"
     );
+    // prefill with what the builder submitted
+    apiFetch("/tracker/requirement?id=" + encodeURIComponent(reqId)).then((d) => {
+      const it = d.item || {};
+      const a = document.getElementById("f_tech"), b = document.getElementById("f_final");
+      if (a && !a.value) a.value = it["Technical File Link"] || "";
+      if (b && !b.value) b.value = it["Final Documentation Note"] || "";
+    }).catch(() => {});
   }
 
   function toggleCatalogFields() {
@@ -329,7 +340,13 @@
       if (!deadline) return showActionError("Please set a deadline.");
       payload.builderEmployeeId = emp.employeeId;
       payload.deadline = deadline;
-    } else if (currentAction === "validate_completion" && document.getElementById("f_publish").checked) {
+    } else if (currentAction === "validate_completion") {
+      payload.technicalLink = document.getElementById("f_tech").value.trim();
+      payload.finalNote = document.getElementById("f_final").value.trim();
+      if (!payload.technicalLink) return showActionError("Add the working link to the technical file.");
+      if (payload.finalNote.length < 10) return showActionError("Add a short final documentation note.");
+    }
+    if (currentAction === "validate_completion" && document.getElementById("f_publish").checked) {
       const type = document.getElementById("f_ctype").value;
       payload.publishToCatalog = true;
       payload.catalog = {
@@ -420,6 +437,12 @@
         html += '<div class="detail-section"><h3>Build</h3><div class="detail-grid">' +
           kv("Builder", d.builder.name + " (" + d.builder.employeeId + ")") +
           kv("Deadline", it["Deadline"]) + "</div></div>";
+      }
+
+      if (it["Technical File Link"] || it["Final Documentation Note"]) {
+        html += '<div class="detail-section"><h3>Technical documentation</h3><div class="detail-grid">' +
+          (it["Technical File Link"] ? '<div class="k">Technical file</div><div>' + linkify(it["Technical File Link"]) + "</div>" : "") +
+          kv("Final note", it["Final Documentation Note"]) + "</div></div>";
       }
 
       if ((d.updates || []).length) {
