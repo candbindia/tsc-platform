@@ -3,69 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>My Tasks — TSC</title>
+<title>My Requests — TSC</title>
 <link rel="icon" href="favicon.svg">
 <link rel="stylesheet" href="style.css">
 <script src="theme.js"></script>
 </head>
 <body>
-<div class="content">
-  <h1>My Tasks</h1>
-  <p class="subtitle">Things you've submitted, or been asked to score or build.</p>
-
+<div class="content" style="max-width:860px;">
+  <div style="display:flex; align-items:center; gap:12px; margin-bottom:4px;">
+    <div class="ic" id="icHeader" style="width:36px; height:36px;"></div>
+    <h1 style="margin:0;">My Requests</h1>
+  </div>
+  <p class="subtitle">Everything you have submitted and where it stands. When we need something from you, it is marked <span class="needs-you">Needs you</span>.</p>
   <div id="list"></div>
   <div id="messageBox"></div>
 </div>
 
-<!-- Scoring panel -->
-<div class="modal-overlay hidden" id="scorePanel">
-  <div class="card wide-modal">
-    <h2 id="scoreTitle">Submit feasibility score</h2>
-    <p class="subtitle">Rate each factor from 1 to 5. For every factor, <strong>5 means a better candidate for automation</strong>. Your score is averaged with the other scorers' scores.</p>
-    <div id="scoreFields"></div>
-    <div id="scoreMessage"></div>
-    <button onclick="handleClick(this, submitScore)">Submit score</button>
-    <button class="secondary" onclick="closeScorePanel()">Cancel</button>
-  </div>
-</div>
-
-<!-- Post update panel -->
-<div class="modal-overlay hidden" id="updatePanel">
-  <div class="card">
-    <h2 id="updateTitle">Post an update</h2>
-    <p class="subtitle">Tell the committee how it's going. A reference is optional here.</p>
-    <label for="updNotes">What's the update?</label>
-    <textarea id="updNotes" rows="3" placeholder="e.g. Data pull is working, starting on the report layout"></textarea>
-    <label for="updRef">Reference (optional)</label>
-    <input type="text" id="updRef" placeholder="Link, file name, tool name — anything that shows the work">
-    <div id="updateMessage"></div>
-    <button onclick="handleClick(this, postUpdate)">Post update</button>
-    <button class="secondary" onclick="closeUpdatePanel()">Cancel</button>
-  </div>
-</div>
-
-<!-- Submit for validation panel -->
-<div class="modal-overlay hidden" id="validatePanel">
-  <div class="card">
-    <h2 id="validateTitle">Submit for validation</h2>
-    <p class="subtitle">Tell the committee where to check your work. It can be a link, a file update, a tool update — anything.</p>
-    <label for="valRef">Where can they check it? <span style="color:var(--danger, #c0392b);">*</span></label>
-    <input type="text" id="valRef" placeholder="e.g. link to the sheet/tool, or &quot;Updated file on shared drive: Reports/Q3.xlsx&quot;">
-    <label for="valTech">Technical file link <span style="color:var(--danger, #c0392b);">*</span></label>
-    <input type="text" id="valTech" placeholder="Working link to the technical file (full link, https://…)">
-    <label for="valFinal">Final documentation note <span style="color:var(--danger, #c0392b);">*</span></label>
-    <textarea id="valFinal" rows="3" placeholder="What was built, where it is stored, and how to maintain it"></textarea>
-    <p class="dim" style="font-size:12px;margin:-4px 0 10px;">Required by the Technology Support protocol — the work can't be closed without a working link.</p>
-    <label for="valNotes">Notes (optional)</label>
-    <textarea id="valNotes" rows="3" placeholder="Anything the reviewers should know"></textarea>
-    <div class="access-list">
-      <strong>Please give access to these people:</strong>
-      <div id="reviewerList" style="margin-top:6px;">Loading…</div>
-    </div>
-    <label class="check-row"><input type="checkbox" id="valAccess"> <span>I've given the people above access to the work.</span></label>
-    <div id="validateMessage"></div>
-    <button onclick="handleClick(this, submitForValidation)">Submit for validation</button>
-    <button class="secondary" onclick="closeValidatePanel()">Cancel</button>
+<div class="modal-overlay hidden" id="detailPanel">
+  <div class="card xl-modal">
+    <div id="detailBody"><p class="subtitle">Loading…</p></div>
+    <button class="secondary no-print" onclick="closeDetail()" style="margin-top:14px;">Close</button>
   </div>
 </div>
 
@@ -76,244 +33,162 @@
 <script src="status.js"></script>
 <script src="nav.js"></script>
 <script>
-  // For every factor, 5 = better candidate for automation.
-  const SCORE_FACTORS = [
-    { key: "manualEffort", label: "Manual Effort",
-      desc: "How much human time and effort the task takes today.",
-      low: "Very little manual effort", high: "Takes a lot of manual effort" },
-    { key: "businessImpact", label: "Business Impact",
-      desc: "How much the business gains (time, money, quality, client experience) if this is automated.",
-      low: "Minimal benefit", high: "Major benefit" },
-    { key: "frequency", label: "Frequency",
-      desc: "How often the task is done.",
-      low: "Rarely (a few times a year)", high: "Daily or many times a day" },
-    { key: "repetitiveness", label: "Repetitiveness",
-      desc: "How similar each run is to the last one.",
-      low: "Different every time", high: "Same steps every time" },
-    { key: "errorPotential", label: "Error Potential",
-      desc: "How likely people are to make mistakes doing it by hand.",
-      low: "Errors are rare", high: "Errors happen often or are costly" },
-    { key: "ruleBasedNature", label: "Rule-Based Nature",
-      desc: "Whether the task follows clear, fixed rules a system could apply.",
-      low: "Mostly judgement calls", high: "Clear rules with no exceptions" },
-    { key: "dataAvailability", label: "Data Availability",
-      desc: "Whether the data needed is digital, accessible and in a usable format.",
-      low: "Paper / scattered / locked away", high: "Digital, structured and easy to reach" },
-    { key: "technicalComplexity", label: "Technical Complexity",
-      desc: "How difficult it would be to build. Scored the opposite way: a simple build is a better candidate.",
-      low: "Very complex to build", high: "Simple to build" },
-    { key: "humanJudgement", label: "Human Judgement",
-      desc: "How much human judgement the task needs. Scored the opposite way: little judgement is a better candidate.",
-      low: "Needs a lot of human judgement", high: "Little or no judgement needed" },
-    { key: "standardisation", label: "Standardisation",
-      desc: "How standard the inputs, formats and process are across teams or cases.",
-      low: "Everyone does it differently", high: "One standard way of doing it" },
-  ];
+  const session = renderTopbar();
+  let currentId = null, lastDetail = null, showFull = false;
+  if (guardRoles(session, ["employee"])) { document.getElementById("icHeader").innerHTML = icon("check-square", 20); loadList(); }
 
-  let currentRequirementId = null;
+  const short = (t, n) => { t = (t || "").toString(); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
+  const nl = (t) => escapeHtml(t).replace(/\n/g, "<br>");
 
-  async function load() {
-    const session = renderTopbar();
-    if (!session) return;
+  async function loadList() {
     try {
-      const data = await apiFetch("/my-tasks");
-      renderList(data.items || []);
-    } catch (err) {
-      showToast(err.message, "error");
-    }
-  }
-
-  function roleChips(roles) {
-    let out = "";
-    if (roles.submitter) out += '<span class="chip">Submitted by me</span>';
-    if (roles.scorer) out += '<span class="chip">Scorer</span>';
-    if (roles.builder) out += '<span class="chip">Builder</span>';
-    return out;
-  }
-
-  function renderList(items) {
-    if (!items.length) {
-      document.getElementById("list").innerHTML = '<p class="subtitle">Nothing here yet — things you submit or get assigned will show up here.</p>';
-      return;
-    }
-
-    let html = "";
-    items.forEach((it) => {
-      const reqId = it["Requirement ID"];
-      const status = it["Status"];
-      const roles = it._roles || {};
-      const idArg = escapeHtml(JSON.stringify(reqId)).replace(/&quot;/g, "&quot;");
-
-      let actions = "";
-      let note = "";
-
-      if (roles.scorer && status === "Assigned for scoring") {
-        if (roles.scorerSubmitted) {
-          note = '<div class="subtitle" style="margin:8px 0 0;">' + icon("check-circle", 13) + " You've submitted your score. Waiting for the other scorers.</div>";
-        } else {
-          actions += '<button class="btn-sm" onclick=\'openScorePanel(' + idArg + ")'>" + icon("star", 13) + " Submit score</button>";
-        }
-      }
-      if (roles.builder && status === "Scored & assigned") {
-        actions += '<button class="btn-sm" onclick=\'handleClick(this, function(){return startWork(' + idArg + ")})'>" + icon("bolt", 13) + " Start work</button>";
-      }
-      if (roles.builder && status === "In progress") {
-        actions += '<button class="btn-sm secondary" onclick=\'openUpdatePanel(' + idArg + ")'>" + icon("send", 13) + " Post update</button>";
-        actions += '<button class="btn-sm" onclick=\'openValidatePanel(' + idArg + ")'>" + icon("check-circle", 13) + " Submit for validation</button>";
-      }
-
-      html +=
-        '<div class="card" style="margin-bottom:16px;">' +
-        '<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">' +
-        '<span style="color:var(--amber-ink);">' + icon("clipboard", 18) + "</span>" +
-        "<strong>" + escapeHtml(reqId) + "</strong>" + statusBadge(status) +
-        (it["Score"] ? '<span class="subtitle" style="margin:0;">Score: ' + escapeHtml(it["Score"]) + " (" + escapeHtml(it["Priority Classification"]) + ")</span>" : "") +
-        "</div>" +
-        '<div class="chip-row" style="margin-top:8px;">' + roleChips(roles) + "</div>" +
-        renderTracker(status) +
-        "<p>" + escapeHtml(it["Process / Activity Description"]) + "</p>" +
-        (status === "Rejected" ? '<div class="error" style="margin:8px 0;"><strong>Reason for rejection:</strong> ' + escapeHtml(it["Rejection Reason"] || "No reason was recorded.") + "</div>" : "") +
-        (it["Deadline"] ? '<p class="subtitle">Deadline: ' + escapeHtml(it["Deadline"]) + "</p>" : "") +
-        (roles.builder && status === "Pending validation" ? '<p class="subtitle">Submitted — waiting for the committee to validate.</p>' : "") +
-        note + actions +
-        "</div>";
-    });
-    document.getElementById("list").innerHTML = html;
-  }
-
-  // ── Scoring
-  function openScorePanel(reqId) {
-    currentRequirementId = reqId;
-    document.getElementById("scoreTitle").textContent = "Feasibility score — " + reqId;
-    document.getElementById("scoreMessage").innerHTML = "";
-    let h = "";
-    SCORE_FACTORS.forEach((f) => {
-      h +=
-        '<div class="factor"><div class="f-name">' + escapeHtml(f.label) + "</div>" +
-        '<div class="f-desc">' + escapeHtml(f.desc) + "</div>" +
-        '<div class="f-scale"><strong>1</strong> = ' + escapeHtml(f.low) + " &nbsp;·&nbsp; <strong>5</strong> = " + escapeHtml(f.high) + "</div>" +
-        '<select id="sf_' + f.key + '"><option value="">Select 1–5…</option>' +
-        '<option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></div>';
-    });
-    document.getElementById("scoreFields").innerHTML = h;
-    document.getElementById("scorePanel").classList.remove("hidden");
-  }
-
-  function closeScorePanel() { document.getElementById("scorePanel").classList.add("hidden"); }
-
-  async function submitScore() {
-    const scores = {};
-    for (const f of SCORE_FACTORS) {
-      const v = document.getElementById("sf_" + f.key).value;
-      if (!v) {
-        document.getElementById("scoreMessage").innerHTML = '<div class="error">Please score "' + escapeHtml(f.label) + '" too.</div>';
+      const data = await apiFetch("/requirements/mine");
+      const items = data.items || [];
+      if (!items.length) {
+        document.getElementById("list").innerHTML = '<div class="card"><p class="subtitle" style="margin:0;">You have not submitted anything yet. <a href="portal-submit.html">Submit a requirement</a>.</p></div>';
         return;
       }
-      scores[f.key] = Number(v);
+      document.getElementById("list").innerHTML = items.map((it) =>
+        '<div class="card req-card" onclick="openDetail(\'' + escapeHtml(it["Requirement ID"]) + '\')">' +
+        '<div class="rc-top"><span class="rc-id">' + escapeHtml(it["Requirement ID"]) + "</span><span>" +
+        (it.needsYou ? '<span class="needs-you">Needs you</span> ' : "") + statusBadgeEmp(it) + "</span></div>" +
+        '<p style="margin:8px 0 4px;">' + escapeHtml(short(it["Process Explanation"], 160)) + "</p>" +
+        '<div class="dim" style="font-size:12px;">Submitted ' + escapeHtml(it["Submission Date"]) + " · about " + escapeHtml(it["Hours Per Month"]) + " hours a month</div>" +
+        (it.step >= 0 ? renderTracker(it.step) : "") +
+        (it["Status"] === "Live" ? '<div style="margin-top:8px;"><strong>' + escapeHtml(it["Automation Name"]) + "</strong> is live.</div>" : "") +
+        "</div>").join("");
+    } catch (err) {
+      document.getElementById("messageBox").innerHTML = '<div class="error"></div>';
+      document.getElementById("messageBox").firstChild.textContent = err.message;
     }
+  }
+
+  // Employees see a simple label, not the internal status names.
+  function statusBadgeEmp(it) {
+    const labels = ["Submitted", "In review", "Scored", "Document ready", "In build", "Live"];
+    if (it["Status"] === "Rejected") return statusBadge("Rejected").replace("Rejected", "Not taken forward");
+    return statusBadge(it["Status"]).replace(/>[^<]*</, ">" + escapeHtml(labels[it.step] || it["Status"]) + "<");
+  }
+
+  async function openDetail(id) {
+    currentId = id; showFull = false;
+    document.getElementById("detailPanel").classList.remove("hidden");
+    document.getElementById("detailBody").innerHTML = '<p class="subtitle">Loading…</p>';
+    await refreshDetail();
+  }
+  function closeDetail() { document.getElementById("detailPanel").classList.add("hidden"); loadList(); }
+
+  async function refreshDetail() {
     try {
-      const data = await apiFetch("/tracker/scoring/submit", {
-        method: "POST",
-        body: JSON.stringify({ requirementId: currentRequirementId, scores }),
+      lastDetail = await apiFetch("/requirements/detail?id=" + encodeURIComponent(currentId));
+      renderDetail();
+    } catch (err) {
+      document.getElementById("detailBody").innerHTML = '<div class="error"></div>';
+      document.getElementById("detailBody").firstChild.textContent = err.message;
+    }
+  }
+
+  function renderDetail() {
+    const d = lastDetail, it = d.item;
+    let h = "<h2>" + escapeHtml(it["Requirement ID"]) + " " + statusBadgeEmp(it) + "</h2>";
+    h += renderTracker(it.step);
+    if (it["Status"] === "Rejected") h += '<div class="support-note"><strong>Not taken forward.</strong><br>' + nl(it["Rejection Reason"]) + "<br><span class=\"dim\">You are welcome to submit it again with more detail, or talk to a Committee member.</span></div>";
+    if (it["Status"] === "Live") h += '<div class="support-note"><strong>' + escapeHtml(it["Automation Name"]) + "</strong> (" + escapeHtml(it["Tool Type"]) + ") is live.<br>" + nl(it["Brief Description"]) + '<br><span class="dim">You will find it in the Catalog. To use it, contact a Committee member.</span></div>';
+
+    if (d.canValidate) {
+      h += '<div class="detail-section"><h3>Your check is needed</h3><div class="support-note">Your automation is ready. Please try it with your real work and tell us if it is right. Only you can validate it, so we wait for you.</div>' +
+        '<label for="vMsg">Message (needed if you send it back)</label><textarea id="vMsg" rows="2" placeholder="What should be changed?"></textarea>' +
+        '<div class="support-actions"><button class="btn-sm" onclick="handleClick(this, () => validate(\'approve\'))">Validate: it works</button>' +
+        '<button class="btn-sm secondary" onclick="handleClick(this, () => validate(\'send_back\'))">Send back</button></div><div id="vErr"></div></div>';
+    }
+
+    if (d.rud) h += renderRud(d);
+
+    h += '<div class="detail-section"><h3>Your request</h3><div class="detail-grid">' +
+      '<div class="k">Tools expected</div><div>' + escapeHtml(it["Tools Expected"]) + (it["Other Tool"] ? " (" + escapeHtml(it["Other Tool"]) + ")" : "") + "</div>" +
+      '<div class="k">How it works today</div><div>' + nl(it["Process Explanation"]) + "</div>" +
+      '<div class="k">Pain point</div><div>' + nl(it["Pain Point"]) + "</div>" +
+      '<div class="k">Effort</div><div>' + escapeHtml(it["Time Per Occurrence (min)"]) + " min, " + escapeHtml(it["Frequency"]) + " (about " + escapeHtml(it["Hours Per Month"]) + " hours a month)</div>" +
+      (it["Reference Link"] ? '<div class="k">Reference</div><div><a href="' + escapeHtml(it["Reference Link"]) + '" target="_blank" rel="noopener">Open link</a></div>' : "") +
+      "</div></div>";
+
+    h += '<div class="detail-section"><h3>Messages and progress</h3><div class="thread-box">' +
+      (d.updates.length ? d.updates.slice().reverse().map((u) =>
+        '<div class="update-item"><div class="u-meta">' + escapeHtml(u.date) + " · " + escapeHtml(u.by) + " (" + escapeHtml(u.role) + ") · " + escapeHtml(u.type) + "</div>" + nl(u.message) + "</div>").join("")
+        : '<p class="dim">Nothing yet.</p>') + "</div>";
+    if (it["Status"] !== "Rejected") {
+      h += '<label for="cMsg">Write to the Committee</label><textarea id="cMsg" rows="2" placeholder="A question or a note"></textarea>' +
+        '<div class="support-actions"><button class="btn-sm" onclick="handleClick(this, comment)">Send</button></div><div id="cErr"></div>';
+    }
+    h += "</div>";
+    document.getElementById("detailBody").innerHTML = h;
+  }
+
+  function renderRud(d) {
+    const r = d.rud;
+    let h = '<div class="detail-section"><h3>Requirement Understanding Document (v' + escapeHtml(r.version) + ")</h3>" +
+      '<p class="dim" style="font-size:12.5px; margin:0 0 8px;">This is what we understood and plan to build. ' +
+      (r.requesterConfirmed ? "You confirmed it on " + escapeHtml(r.requesterConfirmedOn) + "." : "Please read it carefully.") +
+      (r.committeeSignedBy ? " Signed off by the Committee (" + escapeHtml(r.committeeSignedBy) + ", " + escapeHtml(r.committeeSignedOn) + ")." : "") + "</p>";
+    if (!showFull) {
+      h += (r.summary.length ? r.summary.map((s) => '<div class="rud-sec"><h4>' + escapeHtml(s.title) + '</h4><div class="rs-body">' + nl(s.text) + "</div></div>").join("") : "") +
+        '<div class="support-actions no-print"><button class="btn-sm secondary" onclick="showFull=true; renderDetail()">Read the full document</button></div>';
+    } else {
+      let part = "";
+      r.sections.forEach((s) => {
+        if (s.part !== part) { part = s.part; h += '<div class="rs-part rud-sec"><div class="rs-part">' + escapeHtml(part) + "</div></div>"; }
+        h += '<div class="rud-sec"><h4>' + escapeHtml(s.title) + '</h4><div class="rs-body">' + nl(s.content) + "</div></div>";
       });
-      closeScorePanel();
-      if (data.allSubmitted === false) {
-        showToast("Score submitted (" + data.submitted + " of " + data.total + " scorers done). Waiting for the others.", "success");
-      } else {
-        showToast("Score submitted. Average: " + data.score + " (" + data.classification + "). The committee will validate it.", "success");
-      }
-      load();
-    } catch (err) {
-      document.getElementById("scoreMessage").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
+      h += '<div class="support-actions no-print"><button class="btn-sm secondary" onclick="showFull=false; renderDetail()">Show the summary</button>' +
+        '<button class="btn-sm secondary" onclick="printRud()">Print or save as PDF</button></div>';
     }
+    if (d.canConfirmRud) {
+      h += '<div class="no-print" style="margin-top:12px;"><label for="rMsg">Message (needed if you ask for a correction)</label><textarea id="rMsg" rows="2" placeholder="What should be corrected?"></textarea>' +
+        '<div class="support-actions"><button class="btn-sm" onclick="handleClick(this, () => rudRespond(\'confirm\'))">Confirm this understanding</button>' +
+        '<button class="btn-sm secondary" onclick="handleClick(this, () => rudRespond(\'correction\'))">Request a correction</button></div><div id="rErr"></div></div>';
+    }
+    return h + "</div>";
   }
 
-  // ── Builder actions
-  async function progress(payload) {
-    return apiFetch("/tracker/requirements/progress", { method: "POST", body: JSON.stringify(payload) });
+  function printRud() {
+    const r = lastDetail.rud, it = lastDetail.item;
+    const w = window.open("", "_blank");
+    if (!w) { showToast("Allow pop-ups to print the document.", "error"); return; }
+    let body = "<h1>Requirement Understanding Document</h1><p>" + escapeHtml(it["Requirement ID"]) + " · version " + escapeHtml(r.version) + " · " + escapeHtml(r.status) + "</p><p>Requester: " + escapeHtml(r.requester) + " (" + escapeHtml(r.department) + ")</p>";
+    let part = "";
+    r.sections.forEach((s) => {
+      if (s.part !== part) { part = s.part; body += "<h2>" + escapeHtml(part) + "</h2>"; }
+      body += "<h3>" + escapeHtml(s.title) + "</h3><p style='white-space:pre-wrap'>" + escapeHtml(s.content) + "</p>";
+    });
+    w.document.write("<html><head><title>" + escapeHtml(it["Requirement ID"]) + " RUD</title><style>body{font-family:Arial,sans-serif;max-width:760px;margin:30px auto;color:#222}h1{border-bottom:3px solid #f2ac3c;padding-bottom:8px}h2{background:#646767;color:#fff;padding:6px 10px;font-size:15px}h3{font-size:14px;margin-bottom:2px}</style></head><body>" + body + "</body></html>");
+    w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
   }
 
-  async function startWork(reqId) {
+  async function post(path, body) { return apiFetch(path, { method: "POST", body: JSON.stringify(body) }); }
+  function err(id, m) { const el = document.getElementById(id); if (el) { el.innerHTML = '<div class="error"></div>'; el.firstChild.textContent = m; } }
+
+  async function comment() {
+    const m = document.getElementById("cMsg").value.trim();
+    if (!m) return err("cErr", "Please write something first.");
+    try { await post("/requirements/comment", { requirementId: currentId, message: m }); showToast("Sent to the Committee.", "success"); await refreshDetail(); }
+    catch (e) { err("cErr", e.message); }
+  }
+  async function rudRespond(action) {
+    const m = (document.getElementById("rMsg") || {}).value || "";
     try {
-      await progress({ requirementId: reqId, action: "start" });
-      showToast("Marked In Progress — good luck!", "success");
-      load();
-    } catch (err) {
-      showToast(err.message, "error");
-    }
+      await post("/requirements/rud-response", { requirementId: currentId, action, message: m.trim() });
+      showToast(action === "confirm" ? "Thank you, confirmed." : "Correction request sent.", "success");
+      await refreshDetail();
+    } catch (e) { err("rErr", e.message); }
   }
-
-  function openUpdatePanel(reqId) {
-    currentRequirementId = reqId;
-    document.getElementById("updateTitle").textContent = "Post an update — " + reqId;
-    document.getElementById("updNotes").value = "";
-    document.getElementById("updRef").value = "";
-    document.getElementById("updateMessage").innerHTML = "";
-    document.getElementById("updatePanel").classList.remove("hidden");
-  }
-  function closeUpdatePanel() { document.getElementById("updatePanel").classList.add("hidden"); }
-
-  async function postUpdate() {
-    const notes = document.getElementById("updNotes").value.trim();
-    const reference = document.getElementById("updRef").value.trim();
-    if (!notes && !reference) {
-      document.getElementById("updateMessage").innerHTML = '<div class="error">Add a note or a reference.</div>';
-      return;
-    }
+  async function validate(decision) {
+    const m = (document.getElementById("vMsg") || {}).value || "";
     try {
-      await progress({ requirementId: currentRequirementId, action: "update", notes, reference });
-      closeUpdatePanel();
-      showToast("Update posted.", "success");
-      load();
-    } catch (err) {
-      document.getElementById("updateMessage").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
-    }
+      await post("/requirements/validate", { requirementId: currentId, decision, message: m.trim() });
+      showToast(decision === "approve" ? "Thank you, validated." : "Sent back to the Committee.", "success");
+      await refreshDetail();
+    } catch (e) { err("vErr", e.message); }
   }
-
-  async function openValidatePanel(reqId) {
-    currentRequirementId = reqId;
-    document.getElementById("validateTitle").textContent = "Submit for validation — " + reqId;
-    document.getElementById("valRef").value = "";
-    document.getElementById("valNotes").value = "";
-    document.getElementById("valTech").value = "";
-    document.getElementById("valFinal").value = "";
-    document.getElementById("valAccess").checked = false;
-    document.getElementById("validateMessage").innerHTML = "";
-    document.getElementById("reviewerList").textContent = "Loading…";
-    document.getElementById("validatePanel").classList.remove("hidden");
-    try {
-      const data = await apiFetch("/my-tasks/reviewers");
-      const emails = data.emails || [];
-      document.getElementById("reviewerList").innerHTML = emails.length
-        ? emails.map((e) => "<div>" + icon("mail", 12) + " " + escapeHtml(e) + "</div>").join("")
-        : "No Committee / Management emails found — please check with the committee.";
-    } catch (err) {
-      document.getElementById("reviewerList").textContent = "Couldn't load the list: " + err.message;
-    }
-  }
-  function closeValidatePanel() { document.getElementById("validatePanel").classList.add("hidden"); }
-
-  async function submitForValidation() {
-    const reference = document.getElementById("valRef").value.trim();
-    const notes = document.getElementById("valNotes").value.trim();
-    const msg = document.getElementById("validateMessage");
-    if (!reference) { msg.innerHTML = '<div class="error">Tell the committee where to check the work.</div>'; return; }
-    const technicalLink = document.getElementById("valTech").value.trim();
-    const finalNote = document.getElementById("valFinal").value.trim();
-    if (!technicalLink) { msg.innerHTML = '<div class="error">Add the working link to the technical file.</div>'; return; }
-    if (finalNote.length < 10) { msg.innerHTML = '<div class="error">Add a short final documentation note (what was built, where it is stored, how to maintain it).</div>'; return; }
-    if (!document.getElementById("valAccess").checked) { msg.innerHTML = '<div class="error">Please tick the box once you\'ve given access.</div>'; return; }
-    try {
-      await progress({ requirementId: currentRequirementId, action: "submit_for_validation", reference, notes, technicalLink, finalNote, accessConfirmed: true });
-      closeValidatePanel();
-      showToast("Submitted for validation — the committee's been notified.", "success");
-      load();
-    } catch (err) {
-      msg.innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
-    }
-  }
-
-  load();
 </script>
 </body>
 </html>

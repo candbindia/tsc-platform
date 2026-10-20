@@ -14,7 +14,7 @@
     <div class="ic" id="icHeader" style="width:36px; height:36px;"></div>
     <h1 style="margin:0;">Requirement Board</h1>
   </div>
-  <p class="subtitle">What's already been requested, and where each one stands — check here before submitting something that may already be in motion. Scroll sideways to see every column.</p>
+  <p class="subtitle">Every requirement and where it stands. Scroll sideways to see every column.</p>
 
   <div id="list"></div>
   <div id="messageBox"></div>
@@ -26,60 +26,42 @@
 <script src="status.js"></script>
 <script src="nav.js"></script>
 <script>
+  const session = renderTopbar();
   document.getElementById("icHeader").innerHTML = icon("kanban", 20);
 
   async function load() {
-    const session = renderTopbar();
-    if (!session) return;
-
+    if (!guardRoles(session, ["Committee", "Management"])) return;
     try {
       const data = await apiFetch("/board");
       renderBoard(data.items || []);
     } catch (err) {
-      document.getElementById("messageBox").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
+      document.getElementById("messageBox").innerHTML = '<div class="error"></div>';
+      document.getElementById("messageBox").firstChild.textContent = err.message;
     }
   }
 
   function renderBoard(items) {
     if (!items.length) {
-      document.getElementById("list").innerHTML = '<p class="subtitle">Nothing on the board yet.</p>';
+      document.getElementById("list").innerHTML = '<p class="subtitle">Nothing has been submitted yet.</p>';
       return;
     }
-
-    // Group by status, preferring the known workflow order, then anything
-    // else alphabetically, so the board always makes sense even if a
-    // status shows up that isn't one of the 9 standard ones.
     const groups = {};
-    items.forEach((it) => {
-      const s = (it["Status"] || "").trim() || "Unspecified";
-      (groups[s] = groups[s] || []).push(it);
-    });
-
-    const known = Object.keys(STATUS_META).filter((s) => groups[s]);
-    const extra = Object.keys(groups).filter((s) => !STATUS_META[s]).sort();
-    const order = known.concat(extra);
+    items.forEach((it) => { const s = (it["Status"] || "").trim() || "Unspecified"; (groups[s] = groups[s] || []).push(it); });
+    const order = STATUS_ORDER.filter((s) => groups[s]).concat(Object.keys(groups).filter((s) => !STATUS_META[s]).sort());
 
     let html = '<div class="kanban">';
     order.forEach((status) => {
-      const colItems = groups[status];
-      html +=
-        '<div class="kanban-col"><div class="kanban-col-head">' +
-        '<span class="title">' + escapeHtml(status) + "</span>" +
-        '<span class="count">' + colItems.length + "</span>" +
-        "</div><div class=\"kanban-col-body\">";
-      colItems.forEach((it) => {
-        html +=
-          '<div class="kanban-card">' +
-          '<div class="k-title">' + escapeHtml(it["Requirement Name / Short Description"] || "Untitled") + "</div>" +
-          '<div class="subtitle" style="margin:0; font-size:12px;">' + icon("building", 10) + " " + escapeHtml(it["Department"]) + "</div>" +
-          '<div class="k-meta"><span>' + escapeHtml(it["Priority Classification"] || "—") + "</span>" +
-          "<span>" + escapeHtml(it["Expected Timeline"] || "") + "</span></div>" +
-          "</div>";
+      html += '<div class="kanban-col"><div class="kanban-col-head"><span class="title">' + escapeHtml(status) + '</span><span class="count">' + groups[status].length + '</span></div><div class="kanban-col-body">';
+      groups[status].forEach((it) => {
+        html += '<a class="kanban-card" style="display:block; text-decoration:none; color:inherit;" href="tracker-home.html?id=' + encodeURIComponent(it["Requirement ID"]) + '">' +
+          '<div class="k-title">' + escapeHtml(it["Automation Name"] || it["Requirement ID"]) + "</div>" +
+          '<div class="subtitle" style="margin:0; font-size:12px;">' + escapeHtml(it["Process Explanation"]) + "</div>" +
+          '<div class="subtitle" style="margin:4px 0 0; font-size:12px;">' + icon("building", 10) + " " + escapeHtml(it["Department"] || "") + " · " + escapeHtml(it["Submitted By"] || "") + "</div>" +
+          '<div class="k-meta"><span>' + escapeHtml(it["Priority Classification"] || "—") + "</span><span>" + escapeHtml(it["Requirement ID"]) + "</span></div></a>";
       });
       html += "</div></div>";
     });
-    html += "</div>";
-    document.getElementById("list").innerHTML = html;
+    document.getElementById("list").innerHTML = html + "</div>";
   }
 
   load();

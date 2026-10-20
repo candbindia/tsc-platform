@@ -14,12 +14,7 @@ const TOUR_STEPS_EMPLOYEE = [
   {
     selector: 'a[href="portal-catalog.html"]',
     title: "Automation Catalog",
-    text: 'Automations already live. "Open" items link straight through — "On Request" ones route a request to the owner.',
-  },
-  {
-    selector: 'a[href="portal-board.html"]',
-    title: "Requirement Board",
-    text: "Check what's already been requested before submitting something new — it might already be in motion.",
+    text: 'Automations that are already live. To use one, contact a Committee member.',
   },
   {
     selector: 'a[href="portal-submit.html"]',
@@ -28,8 +23,8 @@ const TOUR_STEPS_EMPLOYEE = [
   },
   {
     selector: 'a[href="portal-my-tasks.html"]',
-    title: "My Tasks",
-    text: "Everything tied to you: things you've submitted, and anything assigned to you to score or build — with the actions right there.",
+    title: "My Requests",
+    text: "Everything you have submitted and where it stands. When we need you to confirm a document or validate an automation, it shows here.",
   },
 ];
 
@@ -47,7 +42,7 @@ const TOUR_STEPS_STAFF = [
   {
     selector: 'a[href="tracker-home.html"]',
     title: "Requirement Register",
-    text: "The full list. Committee members can reject, assign for scoring, and validate right from here.",
+    text: "The full list. Committee members review, score, write the document, build and publish from here.",
   },
   {
     selector: 'a[href="portal-catalog.html"]',

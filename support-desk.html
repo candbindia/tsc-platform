@@ -65,6 +65,7 @@
     if (!session) return;
     role = session.role;
     if (role === "employee") { location.href = "support-mine.html"; return; }
+    if (!guardRoles(session, ["Committee", "Management"])) return;
     document.getElementById("deskSub").textContent =
       role === "Committee"
         ? "General requests to the Technology team. Pick them up, ask the requester questions, and close them out."

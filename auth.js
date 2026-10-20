@@ -118,12 +118,7 @@ function handleClick(btn, fn) {
 
 // After login, send each role to the right landing page.
 function redirectAfterLogin(session) {
-  if (session.role === "employee") {
-    window.location.href = "portal-home.html";
-  } else if (session.role === "Management") {
-    window.location.href = "tracker-dashboard.html";
-  } else {
-    // Committee, Admin
-    window.location.href = "tracker-home.html";
-  }
+  window.location.href = typeof homeFor === "function" ? homeFor(session.role) :
+    (session.role === "employee" ? "portal-home.html" : session.role === "Admin" ? "manage-accounts.html" :
+     session.role === "Management" ? "tracker-dashboard.html" : "tracker-home.html");
 }

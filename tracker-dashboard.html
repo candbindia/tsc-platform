@@ -12,7 +12,7 @@
 <body>
 <div class="page wide">
   <h1>TSC Dashboard</h1>
-  <p class="subtitle">A quick view of where everything stands across the pipeline.</p>
+  <p class="subtitle">Where every requirement stands, across the whole pipeline.</p>
 
   <div class="stat-grid" id="statGrid"></div>
 
@@ -22,7 +22,7 @@
       <canvas id="statusChart"></canvas>
     </div>
     <div class="card chart-card">
-      <h2>By priority (scored items)</h2>
+      <h2>By priority (scored)</h2>
       <canvas id="priorityChart"></canvas>
     </div>
   </div>
@@ -32,7 +32,7 @@
       <div class="ic" id="icRegister"></div>
       <div>
         <div class="ic-title">Requirement Register</div>
-        <div class="ic-desc">The full list and, for Committee, the review actions.</div>
+        <div class="ic-desc">The full list and, for Committee, every action.</div>
       </div>
     </a>
     <a class="icon-card" href="portal-catalog.html">
@@ -66,7 +66,7 @@
 
   async function load() {
     const session = renderTopbar();
-    if (!session) return;
+    if (!guardRoles(session, ["Committee", "Management"])) return;
 
     try {
       const data = await apiFetch("/tracker/requirements");
@@ -95,15 +95,18 @@
       if (byPriority[p] !== undefined) byPriority[p]++;
     });
 
-    const liveCount = byStatus["Live on board"] || 0;
-    const needsCommitteeAction =
-      (byStatus["Submitted"] || 0) + (byStatus["Under committee review"] || 0) + (byStatus["Score submitted"] || 0) + (byStatus["Score validated"] || 0) + (byStatus["Pending validation"] || 0);
+    const liveCount = byStatus["Live"] || 0;
+    const needsCommitteeAction = ["Submitted", "Under committee review", "Scoring", "Score confirmed", "RUD draft", "RUD signed off", "Publishing"]
+      .reduce((n, k) => n + (byStatus[k] || 0), 0);
+    const waitingRequester = (byStatus["RUD under review"] || 0) + (byStatus["Awaiting requester validation"] || 0);
+    const hoursLive = Math.round(items.filter((i) => i["Status"] === "Live").reduce((n, i) => n + (Number(i["Hours Per Month"]) || 0), 0));
 
     renderStats([
       { icon: "clipboard", number: total, label: "Total requirements" },
-      { icon: "user-check", number: needsCommitteeAction, label: "Awaiting committee action" },
-      { icon: "check-circle", number: liveCount, label: "Live on board" },
-      { icon: "trending-up", number: byPriority.High, label: "High priority (scored)" },
+      { icon: "user-check", number: needsCommitteeAction, label: "Waiting on the Committee" },
+      { icon: "clock", number: waitingRequester, label: "Waiting on requesters" },
+      { icon: "check-circle", number: liveCount, label: "Live" },
+      { icon: "trending-up", number: hoursLive, label: "Hours a month freed (live)" },
     ].concat(openSupport === null ? [] : [{ icon: "lifebuoy", number: openSupport, label: "Open support requests" }]));
 
     try {
@@ -151,7 +154,7 @@
   function renderCharts(byStatus, byPriority) {
     lastSummary = { byStatus, byPriority };
     const th = chartTheme();
-    const statusLabels = Object.keys(byStatus);
+    const statusLabels = STATUS_ORDER.filter((s) => byStatus[s]).concat(Object.keys(byStatus).filter((s) => !STATUS_META[s]));
     const statusData = statusLabels.map((s) => byStatus[s]);
     const statusColors = statusLabels.map((s) => { const c = STATUS_COLORS[s] || "#646767"; return th.remap[c] || c; });
 

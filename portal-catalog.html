@@ -14,27 +14,14 @@
     <div class="ic" id="icHeader" style="width:36px; height:36px;"></div>
     <h1 style="margin:0;">Automation Catalog</h1>
   </div>
-  <p class="subtitle">Automations already live. "Open" items link straight through. "On Request" items route a request to the owner — nothing is downloadable directly.</p>
+  <p class="subtitle">Automations that are already live. To use one, or to ask about it, please contact a Committee member.</p>
 
   <div style="margin-bottom:4px;">
-    <input type="text" id="searchBox" placeholder="Search by name, department, or description…" oninput="applyFilter()" style="max-width:360px;">
+    <input type="text" id="searchBox" placeholder="Search by name, tool type, department or description…" oninput="applyFilter()" style="max-width:380px;">
   </div>
 
   <div id="list" class="catalog-grid"></div>
   <div id="messageBox"></div>
-</div>
-
-<!-- Deployment request panel -->
-<div class="page hidden" id="requestPanel" style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); margin:0; max-width:none; display:flex; align-items:center; justify-content:center;">
-  <div class="card" style="max-width:420px; width:90%;">
-    <h2 id="requestTitle" style="margin:0 0 4px;">Request deployment</h2>
-    <p class="subtitle">Tell the owner what you'll use it for — they'll reach out directly.</p>
-    <label for="intendedUse">What will you use this for?</label>
-    <textarea id="intendedUse" rows="3" placeholder="e.g. For the Mumbai branch's weekly reconciliation"></textarea>
-    <button id="sendRequestBtn" onclick="handleClick(this, submitDeploymentRequest)">Send request</button>
-    <button class="secondary" type="button" onclick="closeRequestPanel()">Cancel</button>
-    <div id="requestMessage"></div>
-  </div>
 </div>
 
 <script src="config.js"></script>
@@ -43,25 +30,11 @@
 <script src="toast.js"></script>
 <script src="nav.js"></script>
 <script>
-  let currentCatalogId = null;
   let allItems = [];
-
+  const session = renderTopbar();
+  const isStaff = !!session && session.role !== "employee";
   document.getElementById("icHeader").innerHTML = icon("archive", 20);
 
-  async function load() {
-    const session = renderTopbar();
-    if (!session) return;
-
-    try {
-      const data = await apiFetch("/catalog");
-      allItems = data.items || [];
-      renderList(allItems);
-    } catch (err) {
-      document.getElementById("messageBox").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
-    }
-  }
-
-  // Links typed without https:// would be treated as pages on this site (404) - fix them.
   function fixLink(v) {
     let s = (v || "").toString().trim();
     if (!s) return "";
@@ -69,44 +42,31 @@
     return /^https?:\/\//i.test(s) ? s : "";
   }
 
-  function applyFilter() {
-    const q = document.getElementById("searchBox").value.trim().toLowerCase();
-    if (!q) return renderList(allItems);
-    const filtered = allItems.filter((it) =>
-      [it["Automation Name"], it["Department / Function"], it["Description"]]
-        .join(" ")
-        .toLowerCase()
-        .includes(q)
-    );
-    renderList(filtered);
+  async function load() {
+    if (!guardRoles(session, ["employee", "Committee", "Management"])) return;
+    try {
+      const data = await apiFetch("/catalog");
+      allItems = data.items || [];
+      renderList(allItems);
+    } catch (err) {
+      document.getElementById("messageBox").innerHTML = '<div class="error"></div>';
+      document.getElementById("messageBox").firstChild.textContent = err.message;
+    }
   }
 
-  const isStaff = (getSession() || {}).role !== "employee";
+  function applyFilter() {
+    const q = document.getElementById("searchBox").value.trim().toLowerCase();
+    renderList(!q ? allItems : allItems.filter((it) =>
+      [it["Automation Name"], it["Tool Type"], it["Tool Department"], it["Brief Description"]].join(" ").toLowerCase().includes(q)));
+  }
 
   function renderList(items) {
     if (!items.length) {
-      document.getElementById("list").innerHTML = '<p class="subtitle">Nothing matches yet.</p>';
+      document.getElementById("list").innerHTML = '<p class="subtitle">' + (allItems.length ? "Nothing matches your search." :
+        "No automations are listed yet. They appear here as soon as the Committee publishes them.") + "</p>";
       return;
     }
-
-    let html = "";
-    items.forEach((it) => {
-      const isOpen = (it["Access Type"] || "").trim() === "Open";
-      let footer;
-      const link = fixLink(it["Access Link / Instructions"]);
-      if (isOpen && link) {
-        footer =
-          '<a href="' + escapeHtml(link) + '" rel="noopener" target="_blank" style="display:inline-flex; align-items:center; gap:6px; font-weight:600; font-size:13px;">' +
-          icon("external-link", 13) + " Open</a>";
-      } else if (isOpen) {
-        footer = '<span class="badge">Open</span>';
-      } else {
-        footer =
-          '<button style="width:auto; margin:0; padding:7px 14px; font-size:13px;" onclick="openRequestPanel(\'' +
-          escapeHtml(it["Catalog ID"]) + "', '" + escapeHtml(it["Automation Name"]).replace(/'/g, "\\'") + '\')">' +
-          icon("send", 13) + " Request</button>";
-      }
-
+    document.getElementById("list").innerHTML = items.map((it) => {
       let tech = "";
       if (isStaff) {
         const tl = fixLink(it["Technical File Link"]);
@@ -114,42 +74,12 @@
           ? '<div class="cc-tech"><a href="' + escapeHtml(tl) + '" rel="noopener" target="_blank">' + icon("external-link", 11) + " Technical file</a></div>"
           : '<div class="cc-tech missing">' + icon("warning", 11) + " Documentation missing</div>";
       }
-      html +=
-        '<div class="catalog-card">' +
-        '<div class="cc-icon">' + icon("bolt", 20) + "</div>" +
+      return '<div class="catalog-card"><div class="cc-icon">' + icon("bolt", 20) + "</div>" +
         '<div class="cc-title">' + escapeHtml(it["Automation Name"]) + "</div>" +
-        '<div class="cc-dept">' + icon("building", 11) + " " + escapeHtml(it["Department / Function"]) + "</div>" +
-        '<div class="cc-desc">' + escapeHtml(it["Description"]) + "</div>" +
-        '<div class="cc-footer"><span class="badge">' + escapeHtml(it["Status"]) + "</span>" + footer + "</div>" + tech +
-        "</div>";
-    });
-    document.getElementById("list").innerHTML = html;
-  }
-
-  function openRequestPanel(catalogId, name) {
-    currentCatalogId = catalogId;
-    document.getElementById("requestTitle").textContent = "Request access: " + name;
-    document.getElementById("intendedUse").value = "";
-    document.getElementById("requestMessage").innerHTML = "";
-    document.getElementById("requestPanel").classList.remove("hidden");
-  }
-
-  function closeRequestPanel() {
-    document.getElementById("requestPanel").classList.add("hidden");
-  }
-
-  async function submitDeploymentRequest() {
-    const intendedUse = document.getElementById("intendedUse").value.trim();
-    try {
-      const data = await apiFetch("/catalog/deployment-request", {
-        method: "POST",
-        body: JSON.stringify({ catalogId: currentCatalogId, intendedUse }),
-      });
-      closeRequestPanel();
-      showToast("Request sent to the owner — they'll reach out to you directly.", "success");
-    } catch (err) {
-      document.getElementById("requestMessage").innerHTML = '<div class="error">' + escapeHtml(err.message) + "</div>";
-    }
+        '<div class="cc-dept">' + icon("building", 11) + " " + escapeHtml(it["Tool Department"] || "") + " · " + escapeHtml(it["Tool Type"] || "") + "</div>" +
+        '<div class="cc-desc">' + escapeHtml(it["Brief Description"]) + "</div>" +
+        '<div class="cc-footer"><span class="badge">' + escapeHtml(it["Status"] || "Active") + '</span><span class="dim" style="font-size:12px;">Contact a Committee member</span></div>' + tech + "</div>";
+    }).join("");
   }
 
   load();

@@ -8,6 +8,24 @@ function roleLabel(role) {
   return role; // Committee / Management / Admin
 }
 
+// Where each role lands, and which pages each role may open.
+function homeFor(role) {
+  if (role === "employee") return "portal-home.html";
+  if (role === "Admin") return "manage-accounts.html";
+  if (role === "Management") return "tracker-dashboard.html";
+  return "tracker-home.html"; // Committee
+}
+
+// Call at the top of a page: sends anyone who shouldn't be here back to their own home.
+function guardRoles(session, allowed) {
+  if (!session) return false;
+  if (allowed.indexOf(session.role) === -1) {
+    window.location.replace(homeFor(session.role));
+    return false;
+  }
+  return true;
+}
+
 // Menus per role. A "group" becomes a dropdown; a plain link stays in the bar.
 function navItemsFor(role) {
   if (role === "employee") {
@@ -16,9 +34,8 @@ function navItemsFor(role) {
       { label: "Catalog", href: "portal-catalog.html" },
       { label: "Requirements", group: [
         { label: "Submit a Requirement", href: "portal-submit.html" },
-        { label: "Requirement Board", href: "portal-board.html" },
+        { label: "My Requests", href: "portal-my-tasks.html" },
       ] },
-      { label: "My Tasks", href: "portal-my-tasks.html" },
       { label: "Support", group: [
         { label: "Raise a Support Request", href: "support-new.html" },
         { label: "My Support Requests", href: "support-mine.html" },
@@ -26,6 +43,13 @@ function navItemsFor(role) {
       { label: "Help", href: "help.html" },
     ];
   }
+  if (role === "Admin") {
+    return [
+      { label: "Manage Accounts", href: "manage-accounts.html" },
+      { label: "Help", href: "help.html" },
+    ];
+  }
+  // Committee and Management
   return [
     { label: "Dashboard", href: "tracker-dashboard.html" },
     { label: "Requirements", group: [
@@ -72,7 +96,7 @@ function renderTopbar() {
   // brand
   const logo = document.createElement("a");
   logo.className = "brand-logo";
-  logo.href = session.role === "employee" ? "portal-home.html" : "tracker-dashboard.html";
+  logo.href = homeFor(session.role);
   logo.innerHTML = '<img class="brand-img" src="logo-light.png" alt="C&amp;B"><span class="brand-sub">TSC</span>';
   topbar.appendChild(logo);
 

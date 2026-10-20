@@ -11,7 +11,7 @@
 <body>
 <div class="content">
   <h1>Welcome<span id="nameSpan"></span></h1>
-  <p class="subtitle">Check what's already automated before submitting something new — it might already exist, or someone's already working on it.</p>
+  <p class="subtitle">Have a look at what is already automated, or tell us about a manual process worth automating.</p>
 
   <div class="stat-grid" id="statGrid"></div>
 
@@ -20,14 +20,7 @@
       <div class="ic" id="icCatalog"></div>
       <div>
         <div class="ic-title">Automation Catalog</div>
-        <div class="ic-desc">Automations already live, ready to use.</div>
-      </div>
-    </a>
-    <a class="icon-card" href="portal-board.html">
-      <div class="ic" id="icBoard"></div>
-      <div>
-        <div class="ic-title">Requirement Board</div>
-        <div class="ic-desc">What's already been requested and where it stands.</div>
+        <div class="ic-desc">Automations that are already live.</div>
       </div>
     </a>
     <a class="icon-card" href="portal-submit.html">
@@ -40,8 +33,8 @@
     <a class="icon-card" href="portal-my-tasks.html">
       <div class="ic" id="icTasks"></div>
       <div>
-        <div class="ic-title">My Tasks</div>
-        <div class="ic-desc">Things you've submitted, or been assigned to score/build.</div>
+        <div class="ic-title">My Requests</div>
+        <div class="ic-desc">What you have submitted and where it stands.</div>
       </div>
     </a>
     <a class="icon-card" href="support-new.html">
@@ -57,42 +50,30 @@
 <script src="config.js"></script>
 <script src="auth.js"></script>
 <script src="icons.js"></script>
+<script src="status.js"></script>
 <script src="nav.js"></script>
 <script src="tour.js"></script>
 <script>
   document.getElementById("icCatalog").innerHTML = icon("archive", 22);
-  document.getElementById("icBoard").innerHTML = icon("layers", 22);
   document.getElementById("icSubmit").innerHTML = icon("plus-circle", 22);
   document.getElementById("icTasks").innerHTML = icon("check-square", 22);
   document.getElementById("icSupport").innerHTML = icon("lifebuoy", 22);
 
   async function load() {
     const session = renderTopbar();
-    if (!session) return;
+    if (!guardRoles(session, ["employee"])) return;
     document.getElementById("nameSpan").textContent = ", " + session.name;
 
     try {
-      const [catalog, board, tasks] = await Promise.all([
-        apiFetch("/catalog"),
-        apiFetch("/board"),
-        apiFetch("/my-tasks"),
-      ]);
-
-      const liveCount = (catalog.items || []).length;
-      const boardCount = (board.items || []).length;
-      const myItems = tasks.items || [];
-      const needsAction = myItems.filter((it) =>
-        (it._roles && ((it._roles.scorer && !it._roles.scorerSubmitted && it["Status"] === "Assigned for scoring") || (it._roles.builder && ["Scored & assigned", "In progress"].includes(it["Status"]))))
-      ).length;
-
+      const [catalog, mine] = await Promise.all([apiFetch("/catalog"), apiFetch("/requirements/mine")]);
+      const myItems = mine.items || [];
       renderStats([
-        { icon: "package", number: liveCount, label: "Automations live" },
-        { icon: "layers", number: boardCount, label: "On the board" },
-        { icon: "user-check", number: needsAction, label: "Need your action" },
-        { icon: "check-square", number: myItems.length, label: "Total in My Tasks" },
+        { icon: "package", number: (catalog.items || []).length, label: "Automations live" },
+        { icon: "check-square", number: myItems.length, label: "My requests" },
+        { icon: "user-check", number: myItems.filter((i) => i.needsYou).length, label: "Need your action" },
       ]);
     } catch (err) {
-      // Stats are a nice-to-have — stay quiet if they fail to load.
+      // Stats are a nice-to-have - stay quiet if they fail to load.
     }
 
     maybeStartTour(session);
