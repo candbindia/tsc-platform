@@ -122,3 +122,16 @@ function redirectAfterLogin(session) {
     (session.role === "employee" ? "portal-home.html" : session.role === "Admin" ? "manage-accounts.html" :
      session.role === "Management" ? "tracker-dashboard.html" : "tracker-home.html");
 }
+
+// Downloads the RUD from the portal (employees never get a Drive link).
+async function downloadRud(id, format) {
+  try {
+    const d = await apiFetch("/requirements/rud-download?id=" + encodeURIComponent(id) + "&format=" + format);
+    const bin = atob(d.base64), bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([bytes], { type: d.mime }));
+    const a = document.createElement("a");
+    a.href = url; a.download = d.fileName; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  } catch (e) { if (typeof showToast === "function") showToast(e.message, "error"); }
+}

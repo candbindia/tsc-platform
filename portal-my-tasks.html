@@ -142,6 +142,11 @@
       h += '<div class="support-actions no-print"><button class="btn-sm secondary" onclick="showFull=false; renderDetail()">Show the summary</button>' +
         '<button class="btn-sm secondary" onclick="printRud()">Print or save as PDF</button></div>';
     }
+    if (d.canDownloadRud) {
+      const rid = escapeHtml(d.item["Requirement ID"]);
+      h += '<div class="support-actions no-print"><button class="btn-sm secondary" onclick="handleClick(this, () => downloadRud(\'' + rid + '\', \'pdf\'))">Download PDF</button>' +
+        '<button class="btn-sm secondary" onclick="handleClick(this, () => downloadRud(\'' + rid + '\', \'docx\'))">Download Word</button></div>';
+    }
     if (d.canConfirmRud) {
       h += '<div class="no-print" style="margin-top:12px;"><label for="rMsg">Message (needed if you ask for a correction)</label><textarea id="rMsg" rows="2" placeholder="What should be corrected?"></textarea>' +
         '<div class="support-actions"><button class="btn-sm" onclick="handleClick(this, () => rudRespond(\'confirm\'))">Confirm this understanding</button>' +

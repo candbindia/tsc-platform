@@ -120,10 +120,26 @@
     h += '<div id="actErr"></div>' + renderActions();
     h += renderRequest();
     if (D.rud) h += renderRud();
+    h += driveBox();
     h += renderTimeline();
     document.getElementById("detailBody").innerHTML = h;
     if (document.getElementById("sBI")) previewScore();
   }
+
+  function driveBox() {
+    const it = D.item;
+    if (!it["Folder Link"] && !it["RUD Link"] && !D.rud) return "";
+    const a = (u, l) => '<a href="' + escapeHtml(u) + '" target="_blank" rel="noopener">' + l + "</a>";
+    const rid = escapeHtml(it["Requirement ID"]);
+    let h = '<div class="detail-section"><h3>Drive</h3><p class="dim" style="margin:0 0 8px;">The folder and the document live in the Committee Drive. The portal is the master copy; saving here refreshes the Drive document.</p><p style="margin:0 0 8px;">' +
+      (it["Folder Link"] ? "Folder: " + a(it["Folder Link"], "open the requirement folder") : "Folder: not created yet") + "<br>" +
+      (it["RUD Link"] ? "Document: " + a(it["RUD Link"], "open the RUD in Google Docs") : "Document: not created yet") + "</p>";
+    h += '<div class="support-actions">';
+    if (D.canDownloadRud) h += btn("Download PDF", "() => downloadRud('" + rid + "', 'pdf')", true) + btn("Download Word", "() => downloadRud('" + rid + "', 'docx')", true);
+    if (isCommittee() && D.rud) h += btn("Sync to Drive now", "syncDrive", true);
+    return h + "</div></div>";
+  }
+  async function syncDrive() { await act("/tracker/drive/sync", {}, "Drive is up to date"); }
 
   function btn(label, onclick, secondary) { return '<button class="btn-sm' + (secondary ? " secondary" : "") + '" onclick="handleClick(this, ' + onclick + ')">' + label + "</button>"; }
 
@@ -313,7 +329,8 @@
   function publishForm() {
     const it = D.item;
     return '<p class="dim" style="margin:0 0 8px;">The requester validated it. Add what the team will see in the Catalog.</p>' +
-      '<label for="pName">Automation name</label><input type="text" id="pName" maxlength="80">' +
+      '<label for="pName">Automation name</label><input type="text" id="pName" maxlength="80" oninput="suggestCode()">' +
+      '<label for="pTool">Tool code (3 to 20 letters or digits, used in file names; you can edit it)</label><input type="text" id="pTool" maxlength="20" placeholder="e.g. AttendanceMerger" oninput="this.dataset.edited=1">' +
       '<div class="form-grid"><div><label for="pDept">Department this tool belongs to</label><input type="text" id="pDept" list="deptList" oninput="deptCheck()" autocomplete="off">' +
       '<datalist id="deptList">' + departments.map((d) => '<option value="' + escapeHtml(d.name) + '">' + escapeHtml(d.code) + "</option>").join("") + "</datalist></div>" +
       '<div><label for="pType">Tool type</label><select id="pType"><option value="">Select…</option>' + D.toolTypes.map((t) => "<option" + (it["Tools Expected"] === t ? " selected" : "") + ">" + escapeHtml(t) + "</option>").join("") + "</select></div></div>" +
@@ -322,13 +339,18 @@
       '<p class="dim" style="font-size:12px;margin:4px 0 0;">The technical file link and final note are already recorded.</p>' +
       '<div class="support-actions">' + btn("Publish to the Catalog", "publishIt") + "</div>";
   }
+  function suggestCode() {
+    const c = document.getElementById("pTool");
+    if (c.dataset.edited) return;
+    c.value = document.getElementById("pName").value.replace(/[^A-Za-z0-9 ]+/g, " ").split(/\s+/).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join("").slice(0, 20);
+  }
   function deptCheck() {
     const v = document.getElementById("pDept").value.trim().toLowerCase();
     document.getElementById("pCodeWrap").classList.toggle("hidden", !v || departments.some((d) => d.name.toLowerCase() === v));
   }
   async function publishIt() {
     const g = (id) => document.getElementById(id).value.trim();
-    await act("/tracker/publish", { automationName: g("pName"), toolDepartment: g("pDept"), toolType: g("pType"), briefDescription: g("pBrief"), departmentCode: g("pCode") }, "Published. It is live in the Catalog.");
+    await act("/tracker/publish", { automationName: g("pName"), toolCode: g("pTool"), toolDepartment: g("pDept"), toolType: g("pType"), briefDescription: g("pBrief"), departmentCode: g("pCode") }, "Published. It is live in the Catalog.");
   }
 
   // ───────────── timeline + comments ─────────────
