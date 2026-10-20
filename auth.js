@@ -135,3 +135,36 @@ async function downloadRud(id, format) {
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   } catch (e) { if (typeof showToast === "function") showToast(e.message, "error"); }
 }
+
+// ───────── File picking (attachments, code, guides) ─────────
+const FILE_EXT_INPUT = ["xlsx", "xls", "xlsm", "csv", "pdf", "docx", "doc", "pptx", "ppt", "txt", "png", "jpg", "jpeg", "zip", "json"];
+const FILE_EXT_TOOL = FILE_EXT_INPUT.concat(["py", "js", "ts", "sql", "bas", "vba", "ps1", "sh", "ipynb", "pbix", "md", "html", "gs"]);
+const FILE_MAX_MB = 10;
+
+// Returns an error message, or "" when the picked files are fine.
+function checkPicked(files, exts) {
+  for (const f of files) {
+    const ext = (f.name.split(".").pop() || "").toLowerCase();
+    if (f.name.indexOf(".") < 0 || !exts.includes(ext)) return '"' + f.name + '" is not an allowed file type.';
+    if (f.size > FILE_MAX_MB * 1024 * 1024) return '"' + f.name + '" is larger than ' + FILE_MAX_MB + " MB.";
+    if (f.size === 0) return '"' + f.name + '" is empty.';
+  }
+  return "";
+}
+
+function readFileB64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(",")[1] || "");
+    r.onerror = () => reject(new Error("Could not read " + file.name));
+    r.readAsDataURL(file);
+  });
+}
+
+async function filesToPayload(files) {
+  const out = [];
+  for (const f of files) out.push({ name: f.name, base64: await readFileB64(f) });
+  return out;
+}
+
+function fmtSize(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB"; }

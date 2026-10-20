@@ -53,7 +53,11 @@
 
     <label for="reference">Link to the current work (optional)</label>
     <input type="text" id="reference" placeholder="Paste a link to a sample file or sheet (make sure the Committee can open it)">
-    <p class="dim" style="font-size:12px; margin:4px 0 0;">Direct file attachments are coming soon. For now, share the file through your usual drive and paste the link here.</p>
+
+    <label for="fileInput">Attach sample files (optional)</label>
+    <input type="file" id="fileInput" multiple accept=".xlsx,.xls,.xlsm,.csv,.pdf,.docx,.doc,.pptx,.ppt,.txt,.png,.jpg,.jpeg,.zip,.json" onchange="filesPicked(this)">
+    <div id="fileList"></div>
+    <p class="dim" style="font-size:12px; margin:4px 0 0;">Up to 3 files, 10 MB each: a sample of the input, an example of the output you expect, a screenshot. Please remove personal or confidential data first.</p>
 
     <button type="submit" style="margin-top:16px;">Submit</button>
     <div id="messageBox"></div>
@@ -100,6 +104,24 @@
       : "That is about <strong>" + h + " hours a month</strong> spent on this.";
   }
 
+  let pickedFiles = [];
+  function filesPicked(inp) {
+    const add = Array.from(inp.files);
+    inp.value = "";
+    const next = pickedFiles.concat(add);
+    const box = document.getElementById("messageBox");
+    box.innerHTML = "";
+    const err = next.length > 3 ? "You can attach up to 3 files." : checkPicked(add, FILE_EXT_INPUT);
+    if (err) { box.innerHTML = '<div class="error"></div>'; box.firstChild.textContent = err; return; }
+    pickedFiles = next;
+    renderPicked();
+  }
+  function removePicked(i) { pickedFiles.splice(i, 1); renderPicked(); }
+  function renderPicked() {
+    document.getElementById("fileList").innerHTML = pickedFiles.map((f, i) =>
+      '<div class="file-chip">' + escapeHtml(f.name) + ' <span class="dim">(' + fmtSize(f.size) + ')</span> <a href="#" onclick="removePicked(' + i + '); return false;">remove</a></div>').join("");
+  }
+
   async function submitRequirement() {
     const box = document.getElementById("messageBox");
     box.innerHTML = "";
@@ -117,7 +139,9 @@
     if (frequency === "Ad hoc" && !Number(document.getElementById("timesPerMonth").value)) return fail("Please say roughly how many times a month.");
 
     try {
+      const files = pickedFiles.length ? await filesToPayload(pickedFiles) : [];
       const data = await apiFetch("/requirements/submit", { method: "POST", body: JSON.stringify({
+        files,
         tools, otherTool: document.getElementById("otherTool").value.trim(), process: proc,
         painPoint: document.getElementById("painPoint").value.trim(),
         minutes: Number(document.getElementById("minutes").value), frequency,
@@ -125,7 +149,8 @@
         reference: document.getElementById("reference").value.trim(),
       }) });
       showToast("Submitted: " + data.requirementId + ". Follow it under My Requests.", "success");
-      setTimeout(() => { window.location.href = "portal-my-tasks.html"; }, 1200);
+      if (data.filesProblem) showToast(data.filesProblem, "error");
+      setTimeout(() => { window.location.href = "portal-my-tasks.html"; }, data.filesProblem ? 4500 : 1200);
     } catch (err) { fail(err.message); }
   }
 </script>

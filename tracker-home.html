@@ -120,7 +120,7 @@
     h += '<div id="actErr"></div>' + renderActions();
     h += renderRequest();
     if (D.rud) h += renderRud();
-    h += driveBox();
+    h += driveBox() + filesBox();
     h += renderTimeline();
     document.getElementById("detailBody").innerHTML = h;
     if (document.getElementById("sBI")) previewScore();
@@ -138,6 +138,41 @@
     if (D.canDownloadRud) h += btn("Download PDF", "() => downloadRud('" + rid + "', 'pdf')", true) + btn("Download Word", "() => downloadRud('" + rid + "', 'docx')", true);
     if (isCommittee() && D.rud) h += btn("Sync to Drive now", "syncDrive", true);
     return h + "</div></div>";
+  }
+  function filesBox() {
+    const it = D.item, files = D.files || [];
+    const c = isCommittee();
+    if (!files.length && !c) return "";
+    const a = (u, l) => '<a href="' + escapeHtml(u) + '" target="_blank" rel="noopener">' + escapeHtml(l) + "</a>";
+    let h = '<div class="detail-section"><h3>Files</h3>';
+    h += files.length ? '<ul class="file-list">' + files.map((f) => "<li><strong>" + escapeHtml(f.type) + (f.version ? " v" + escapeHtml(f.version) : "") + "</strong> · " + a(f.link, f.name) +
+      ' <span class="dim">· ' + escapeHtml(f.by) + ", " + escapeHtml(f.on) + (f.note ? " · " + escapeHtml(f.note) : "") + "</span></li>").join("") + "</ul>" : '<p class="dim" style="margin:0 0 6px;">No files yet.</p>';
+    if (c) {
+      if (D.canAttach) h += upRow("Input sample from the requester", "attach", "fIn", FILE_EXT_INPUT, true);
+      if (D.canUploadTool) {
+        h += upRow("Code (a new upload becomes the next version; the old one goes to the archive)", "code", "fCode", FILE_EXT_TOOL) +
+          upRow("User guide (versioned the same way)", "guide", "fGuide", FILE_EXT_TOOL) +
+          upRow("Sample output", "output", "fOut", FILE_EXT_TOOL, true, '<input type="text" id="fOutType" maxlength="20" placeholder="Output type, e.g. DailyReport" style="max-width:240px;">');
+      } else if (it["Status"] !== "Live") {
+        h += '<p class="dim" style="font-size:12px;margin:8px 0 0;">Code, user guide and output files are added once the tool is published, because their names use the department and tool codes.</p>';
+      }
+    }
+    return h + '<div id="fileErr"></div></div>';
+  }
+  function upRow(label, kind, id, exts, multi, extra) {
+    return '<div style="margin-top:10px;"><label for="' + id + '">' + label + "</label>" + (extra || "") +
+      '<input type="file" id="' + id + '"' + (multi ? " multiple" : "") + ' accept="' + exts.map((e) => "." + e).join(",") + '">' +
+      '<div class="support-actions">' + btn("Upload", "() => uploadPick('" + kind + "', '" + id + "')", true) + "</div></div>";
+  }
+  async function uploadPick(kind, id) {
+    const files = Array.from(document.getElementById(id).files);
+    if (!files.length) return showErr("fileErr", "Please pick a file first.");
+    const bad = checkPicked(files, kind === "attach" ? FILE_EXT_INPUT : FILE_EXT_TOOL);
+    if (bad) return showErr("fileErr", bad);
+    const body = { files: await filesToPayload(files) };
+    if (kind === "output") body.outputType = document.getElementById("fOutType").value.trim();
+    if (kind !== "attach") body.kind = kind;
+    await act(kind === "attach" ? "/requirements/attach" : "/tracker/files/upload", body, "Uploaded to Drive", "fileErr");
   }
   async function syncDrive() { await act("/tracker/drive/sync", {}, "Drive is up to date"); }
 
@@ -336,7 +371,9 @@
       '<div><label for="pType">Tool type</label><select id="pType"><option value="">Select…</option>' + D.toolTypes.map((t) => "<option" + (it["Tools Expected"] === t ? " selected" : "") + ">" + escapeHtml(t) + "</option>").join("") + "</select></div></div>" +
       '<div id="pCodeWrap" class="hidden"><label for="pCode">New department: short code (2 to 5 letters, e.g. HR, FIN)</label><input type="text" id="pCode" maxlength="5" style="text-transform:uppercase;"></div>' +
       '<label for="pBrief">Brief description</label><textarea id="pBrief" rows="3" maxlength="400" placeholder="What the tool does, in a line or two"></textarea>' +
-      '<p class="dim" style="font-size:12px;margin:4px 0 0;">The technical file link and final note are already recorded.</p>' +
+      '<div class="form-grid"><div><label for="pCodeFile">Code file (optional)</label><input type="file" id="pCodeFile" accept="' + FILE_EXT_TOOL.map((e) => "." + e).join(",") + '"></div>' +
+      '<div><label for="pGuideFile">User guide (optional)</label><input type="file" id="pGuideFile" accept="' + FILE_EXT_TOOL.map((e) => "." + e).join(",") + '"></div></div>' +
+      '<p class="dim" style="font-size:12px;margin:4px 0 0;">The technical file link and final note are already recorded. Files are saved to Drive with the standard name once published.</p>' +
       '<div class="support-actions">' + btn("Publish to the Catalog", "publishIt") + "</div>";
   }
   function suggestCode() {
@@ -350,7 +387,15 @@
   }
   async function publishIt() {
     const g = (id) => document.getElementById(id).value.trim();
-    await act("/tracker/publish", { automationName: g("pName"), toolCode: g("pTool"), toolDepartment: g("pDept"), toolType: g("pType"), briefDescription: g("pBrief"), departmentCode: g("pCode") }, "Published. It is live in the Catalog.");
+    const pf = [["code", "pCodeFile"], ["guide", "pGuideFile"]].map(([k, id]) => [k, document.getElementById(id).files[0]]).filter((x) => x[1]);
+    for (const [, f] of pf) { const bad = checkPicked([f], FILE_EXT_TOOL); if (bad) return showErr("actErr", bad); }
+    const r = await act("/tracker/publish", { automationName: g("pName"), toolCode: g("pTool"), toolDepartment: g("pDept"), toolType: g("pType"), briefDescription: g("pBrief"), departmentCode: g("pCode") }, "Published. It is live in the Catalog.");
+    if (!r) return;
+    for (const [kind, f] of pf) {
+      try { await post("/tracker/files/upload", { requirementId: currentId, kind, files: await filesToPayload([f]) }); showToast(f.name + " saved to Drive", "success"); }
+      catch (e) { showToast("Published, but " + f.name + " was not saved: " + e.message + " Add it under Files.", "error"); }
+    }
+    if (pf.length) await refresh();
   }
 
   // ───────────── timeline + comments ─────────────

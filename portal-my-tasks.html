@@ -112,6 +112,15 @@
       (it["Reference Link"] ? '<div class="k">Reference</div><div><a href="' + escapeHtml(it["Reference Link"]) + '" target="_blank" rel="noopener">Open link</a></div>' : "") +
       "</div></div>";
 
+    h += '<div class="detail-section"><h3>Files you added</h3>' +
+      ((d.files || []).length ? '<ul class="file-list">' + d.files.map((f) => "<li>" + escapeHtml(f.name) + ' <span class="dim">· ' + escapeHtml(f.on) + "</span></li>").join("") + "</ul>" : '<p class="dim" style="margin:0 0 6px;">No files yet.</p>');
+    if (d.canAttach) {
+      h += '<input type="file" id="addFiles" multiple accept=".xlsx,.xls,.xlsm,.csv,.pdf,.docx,.doc,.pptx,.ppt,.txt,.png,.jpg,.jpeg,.zip,.json">' +
+        '<p class="dim" style="font-size:12px;margin:4px 0 0;">Up to 3 at a time, 10 MB each, 6 in total. Please remove personal or confidential data first.</p>' +
+        '<div class="support-actions"><button class="btn-sm" onclick="handleClick(this, addFiles)">Add files</button></div><div id="fErr"></div>';
+    }
+    h += "</div>";
+
     h += '<div class="detail-section"><h3>Messages and progress</h3><div class="thread-box">' +
       (d.updates.length ? d.updates.slice().reverse().map((u) =>
         '<div class="update-item"><div class="u-meta">' + escapeHtml(u.date) + " · " + escapeHtml(u.by) + " (" + escapeHtml(u.role) + ") · " + escapeHtml(u.type) + "</div>" + nl(u.message) + "</div>").join("")
@@ -169,6 +178,18 @@
     w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
   }
 
+  async function addFiles() {
+    const err = document.getElementById("fErr"); err.innerHTML = "";
+    const files = Array.from(document.getElementById("addFiles").files);
+    const fail = (t) => { err.innerHTML = '<div class="error"></div>'; err.firstChild.textContent = t; };
+    if (!files.length) return fail("Please pick a file first.");
+    if (files.length > 3) return fail("Please add up to 3 files at a time.");
+    const bad = checkPicked(files, FILE_EXT_INPUT); if (bad) return fail(bad);
+    try {
+      await apiFetch("/requirements/attach", { method: "POST", body: JSON.stringify({ requirementId: currentId, files: await filesToPayload(files) }) });
+      showToast("Files added", "success"); await refreshDetail();
+    } catch (e) { fail(e.message); }
+  }
   async function post(path, body) { return apiFetch(path, { method: "POST", body: JSON.stringify(body) }); }
   function err(id, m) { const el = document.getElementById(id); if (el) { el.innerHTML = '<div class="error"></div>'; el.firstChild.textContent = m; } }
 
