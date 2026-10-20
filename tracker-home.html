@@ -225,6 +225,9 @@
       if (c && D.youAreBuilder) {
         h += box("You are building this", '<p class="dim" style="margin:0 0 8px;">When it is ready, add the technical documentation. It is mandatory. Then the requester validates it.</p>' +
           '<label for="bLink">Link to the technical file (working https link)</label><input type="text" id="bLink" value="' + escapeHtml(it["Technical File Link"] || "") + '">' +
+          '<div class="support-note" style="margin-top:10px;"><strong>For the requester to try.</strong> Give a link to the workable file, or upload it (or both). The requester sees this under My Requests while validating.</div>' +
+          '<label for="bTest">Link to the workable file (optional if you upload it)</label><input type="text" id="bTest" placeholder="https://…">' +
+          '<label for="bFile">Or upload the workable file (up to 10 MB)</label><input type="file" id="bFile" accept="' + FILE_EXT_TOOL.map((e) => "." + e).join(",") + '">' +
           '<label for="bNote">Final documentation note (what was built, where it is stored, how to maintain it)</label><textarea id="bNote" rows="3">' + escapeHtml(it["Final Documentation Note"] || "") + "</textarea>" +
           '<div class="support-actions">' + btn("Send to the requester for validation", "submitBuild") + "</div>");
       } else {
@@ -264,7 +267,10 @@
     await act("/tracker/build/start", { acknowledgeReview: ack ? ack.checked : false }, "You are building this");
   }
   async function submitBuild() {
-    await act("/tracker/build/submit", { technicalLink: document.getElementById("bLink").value.trim(), finalNote: document.getElementById("bNote").value.trim() }, "Sent to the requester for validation");
+    const f = document.getElementById("bFile").files[0];
+    if (f) { const bad = checkPicked([f], FILE_EXT_TOOL); if (bad) return showErr("actErr", bad); }
+    await act("/tracker/build/submit", { technicalLink: document.getElementById("bLink").value.trim(), finalNote: document.getElementById("bNote").value.trim(),
+      testLink: document.getElementById("bTest").value.trim(), files: f ? await filesToPayload([f]) : [] }, "Sent to the requester for validation");
   }
   async function proceedIt() { await act("/tracker/validation/proceed", { note: document.getElementById("pNote").value.trim() }, "Moved on to publishing"); }
 

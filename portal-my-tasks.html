@@ -96,7 +96,11 @@
     if (it["Status"] === "Live") h += '<div class="support-note"><strong>' + escapeHtml(it["Automation Name"]) + "</strong> (" + escapeHtml(it["Tool Type"]) + ") is live.<br>" + nl(it["Brief Description"]) + '<br><span class="dim">You will find it in the Catalog. To use it, contact a Committee member.</span></div>';
 
     if (d.canValidate) {
+      const tst = d.test || {};
       h += '<div class="detail-section"><h3>Your check is needed</h3><div class="support-note">Your automation is ready. Please try it with your real work and tell us if it is right. Only you can validate it, so we wait for you.</div>' +
+        ((tst.link || tst.fileName) ? '<div class="support-note" style="margin-top:8px;"><strong>Try it here</strong><br>' +
+          (tst.link ? '<a href="' + escapeHtml(tst.link) + '" target="_blank" rel="noopener">Open the workable file</a><br>' : "") +
+          (tst.fileName ? '<button class="btn-sm secondary" style="margin-top:6px;" onclick="handleClick(this, () => downloadTest())">Download ' + escapeHtml(tst.fileName.replace(/^AIR-\d{4}-\d+_Test_/, "")) + "</button>" : "") + "</div>" : "") +
         '<label for="vMsg">Message (needed if you send it back)</label><textarea id="vMsg" rows="2" placeholder="What should be changed?"></textarea>' +
         '<div class="support-actions"><button class="btn-sm" onclick="handleClick(this, () => validate(\'approve\'))">Validate: it works</button>' +
         '<button class="btn-sm secondary" onclick="handleClick(this, () => validate(\'send_back\'))">Send back</button></div><div id="vErr"></div></div>';
@@ -178,6 +182,16 @@
     w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
   }
 
+  async function downloadTest() {
+    try {
+      const d = await apiFetch("/requirements/test-download?id=" + encodeURIComponent(currentId));
+      const bin = atob(d.base64), bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const url = URL.createObjectURL(new Blob([bytes], { type: d.mime }));
+      const a = document.createElement("a"); a.href = url; a.download = d.fileName.replace(/^AIR-\d{4}-\d+_Test_/, ""); document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (e) { showToast(e.message, "error"); }
+  }
   async function addFiles() {
     const err = document.getElementById("fErr"); err.innerHTML = "";
     const files = Array.from(document.getElementById("addFiles").files);
