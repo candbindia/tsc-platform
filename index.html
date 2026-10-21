@@ -19,7 +19,7 @@
     <p class="subtitle">Consulting &amp; Beyond</p>
 
     <div class="tabs">
-      <div class="tab active" id="tabEmployee" onclick="showTab('employee')">Employee</div>
+      <div class="tab active" id="tabEmployee" onclick="showTab('employee')">CABIES</div>
       <div class="tab" id="tabStaff" onclick="showTab('staff')">Committee / Management</div>
     </div>
 
@@ -27,7 +27,7 @@
     <div id="employeePanel">
       <form id="empStep1" onsubmit="return handleFormSubmit(event, checkEmployeeId);">
         <div class="step-icon" id="iconStep1"></div>
-        <label for="employeeId">Employee ID</label>
+        <label for="employeeId">CABIES ID</label>
         <input type="text" id="employeeId" placeholder="e.g. CB1102" autocomplete="off" autofocus>
         <button type="submit">Continue</button>
       </form>
@@ -43,7 +43,7 @@
 
       <form id="empStepRegister" class="hidden" onsubmit="return handleFormSubmit(event, requestCodeSubmit);">
         <div class="step-icon" id="iconStepRegister"></div>
-        <p class="subtitle" style="text-align:center;">First visit! To make sure it's really you, we'll email a 6-digit code to the work email HR has on file for your Employee ID.</p>
+        <p class="subtitle" style="text-align:center;">First visit! To make sure it's really you, we'll email a 6-digit code to the work email HR has on file for your CABIES ID.</p>
         <button type="submit">Email me a code</button>
         <button type="button" class="secondary" onclick="backToStep1()">Back</button>
       </form>
@@ -120,7 +120,7 @@
   async function checkEmployeeId() {
     clearMessage();
     const employeeId = document.getElementById("employeeId").value.trim();
-    if (!employeeId) return showError("Enter your Employee ID.");
+    if (!employeeId) return showError("Enter your CABIES ID.");
 
     try {
       const res = await fetch(API_BASE + "/auth/employee/check-id", {
@@ -132,7 +132,7 @@
 
       if (!res.ok) return showError(data.error || "Something went wrong.");
       if (!data.valid) {
-        return showError("Employee ID not recognized or not active. Contact HR if this seems wrong.");
+        return showError("CABIES ID not recognized or not active. Contact HR if this seems wrong.");
       }
 
       currentEmployeeId = employeeId;

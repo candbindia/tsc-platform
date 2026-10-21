@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="node_modules/@fontsource/urbanist/700.css">
+<link rel="stylesheet" href="node_modules/@fontsource/urbanist/800.css">
+<link rel="stylesheet" href="node_modules/@fortawesome/fontawesome-free/css/all.min.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    width: 1200px; height: 1600px;
+    background: #f2f1ee;
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: #111111;
+    overflow: hidden;
+  }
+
+  .poster {
+    width: 1200px; height: 1600px;
+    padding: 80px 90px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    background:
+      radial-gradient(circle at 85% 8%, rgba(242,172,60,0.20), transparent 42%),
+      radial-gradient(circle at 10% 95%, rgba(248,214,90,0.22), transparent 40%),
+      #f2f1ee;
+  }
+
+  .logo-row { display: flex; align-items: center; gap: 14px; }
+  .logo-bar { width: 7px; height: 52px; background: #f2ac3c; border-radius: 3px; }
+  .logo-mark { font-family: "Urbanist", sans-serif; font-weight: 800; font-size: 44px; letter-spacing: 1px; }
+
+  .eyebrow {
+    margin-top: 46px;
+    color: #8f5a00;
+    font-family: "Urbanist", sans-serif;
+    font-weight: 700;
+    font-size: 20px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    font-family: "Urbanist", sans-serif;
+    font-weight: 800;
+    font-size: 64px;
+    line-height: 1.08;
+    margin: 14px 0 0;
+    color: #111111;
+  }
+
+  h1 .accent { color: #646767; }
+
+  .tagline {
+    font-size: 24px;
+    color: #646767;
+    margin-top: 20px;
+    max-width: 880px;
+    line-height: 1.5;
+  }
+
+  .steps {
+    margin-top: 56px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+    flex-grow: 1;
+  }
+
+  .step {
+    background: #ffffff;
+    border: 1px solid #dcdad4;
+    border-radius: 18px;
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .step .num {
+    width: 54px; height: 54px;
+    border-radius: 50%;
+    background: rgba(242,172,60,0.25);
+    color: #8f5a00;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+  }
+
+  .step .stitle {
+    font-family: "Urbanist", sans-serif;
+    font-weight: 700;
+    font-size: 26px;
+    color: #111111;
+  }
+
+  .step .sdesc {
+    font-size: 17px;
+    color: #646767;
+    line-height: 1.55;
+  }
+
+  .footer {
+    margin-top: 44px;
+    padding-top: 36px;
+    border-top: 1px solid #dcdad4;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .footer .login-box {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .footer .login-box .icon-circle {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: #f2ac3c;
+    color: #111111;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+    flex-shrink: 0;
+  }
+
+  .footer .login-label {
+    font-size: 15px;
+    color: #646767;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+  }
+
+  .footer .login-url {
+    font-family: "Urbanist", sans-serif;
+    font-weight: 700;
+    font-size: 26px;
+    color: #111111;
+    margin-top: 2px;
+  }
+
+  .footer .brand-sub {
+    font-size: 16px;
+    color: #646767;
+    text-align: right;
+    line-height: 1.5;
+  }
+
+  .band{margin-top:58px;font-family:"Urbanist",sans-serif;font-weight:800;font-size:22px;letter-spacing:2px;text-transform:uppercase;color:#8f5a00;}
+  .first{margin-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;}
+  .first .step{padding:36px 30px;gap:16px}
+  .first .stitle{font-size:23px}.first .sdesc{font-size:18px}
+  .two{margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  .two .step{padding:40px 34px;gap:16px;background:#fff;border-left:7px solid #f2ac3c}
+  .two .stitle{font-size:26px}.two .sdesc{font-size:19px}
+  .two .path{font-size:15px;font-weight:700;color:#8f5a00;background:rgba(242,172,60,0.2);padding:7px 12px;border-radius:8px;align-self:flex-start}
+  .note{margin-top:34px;font-size:19px;color:#646767;line-height:1.5}
+  .note b{color:#111}
+
+  </style></head><body><div class="poster"><div style="position:absolute;top:0;left:0;right:0;height:18px;background:#646767;border-bottom:5px solid #f2ac3c;"></div>
+  <div class="logo-row"><img src="logo.png" style="height:96px;margin:0 0 -6px 0;"></div>
+  <div class="eyebrow">Consulting &amp; Beyond · Now live</div>
+  <h1>The TSC Portal<br><span class="accent">is open for everyone</span></h1>
+  <div class="tagline" style="margin-top:16px">One place for automation ideas and technology help. Create your password once, then log in any time.</div>
+
+  <div class="band">First time? Create your password</div>
+  <div class="first">
+   <div class="step"><div class="num"><i class="fa-solid fa-id-badge"></i></div><div class="stitle">1. Enter your CABIES ID</div><div class="sdesc">Open the portal and choose “First time? Create password”.</div></div>
+   <div class="step"><div class="num"><i class="fa-solid fa-envelope-open-text"></i></div><div class="stitle">2. Check your email</div><div class="sdesc">A 6-digit code is sent to your Work Email. Enter it on the page.</div></div>
+   <div class="step"><div class="num"><i class="fa-solid fa-lock"></i></div><div class="stitle">3. Set a password</div><div class="sdesc">Minimum 8 characters. After this, log in with CABIES ID + password.</div></div>
+  </div>
+
+  <div class="band">Then use the portal for</div>
+  <div class="two">
+   <div class="step"><div class="num"><i class="fa-solid fa-lightbulb"></i></div><div class="stitle">Automation requirements</div><div class="sdesc">Have a repetitive manual task? Check the Catalog and Board first, then submit it. We score it, assign a builder and take it live.</div><div class="path">Requirements → Submit a Requirement</div></div>
+   <div class="step"><div class="num"><i class="fa-solid fa-life-ring"></i></div><div class="stitle">Technology support</div><div class="sdesc">Sheet changes, new reports, something not working, access or training help. Raise it and track it to completion.</div><div class="path">Support → Raise a Support Request</div></div>
+  </div>
+  <div class="note"><b>You will get an email at every step.</b> Track everything under My Tasks and My Support Requests. Forgot your password? Ask the Committee to reset it.</div>
+
+  <div style="flex-grow:1"></div>
+  <div class="footer">
+   <div class="login-box"><div class="icon-circle"><i class="fa-solid fa-link"></i></div><div><div class="login-label">Open the portal</div><div class="login-url">candbindia.github.io/tsc-platform</div></div></div>
+   <div style="display:flex;align-items:center;gap:22px;"><div class="brand-sub">Scan to open,<br>or type the link.<br>Questions? Ask any<br>TSC Committee member.</div><img src="data:image/png;base64,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" style="width:130px;height:130px;border-radius:10px;border:1px solid #dcdad4;background:#fff;padding:6px;"></div>
+  </div></div></body></html>

@@ -11,7 +11,7 @@
 <body>
 <div class="page wide">
   <h1>Manage Accounts</h1>
-  <p class="subtitle">Create and manage Committee, Management and Admin logins, and help employees who are locked out.</p>
+  <p class="subtitle">Create and manage Committee, Management and Admin logins, and help CABIES who are locked out.</p>
 
   <!-- Create -->
   <div class="card" style="margin-bottom:20px;">
@@ -54,8 +54,8 @@
 
   <!-- Employees -->
   <div class="card">
-    <h2>Employee logins</h2>
-    <p class="subtitle">Employees register themselves with an emailed code. If one forgets their password, reset it here — they'll verify by email code again and choose a new one.</p>
+    <h2>CABIES logins</h2>
+    <p class="subtitle">CABIES register themselves with an emailed code. If one forgets their password, reset it here — they'll verify by email code again and choose a new one.</p>
     <input type="text" id="empSearch" placeholder="Search by ID, name or department…" oninput="renderEmployees()" style="max-width:360px;">
     <div class="table-wrap" id="empList"><p class="subtitle">Loading…</p></div>
   </div>
@@ -328,7 +328,7 @@
     const q = document.getElementById("empSearch").value.trim().toLowerCase();
     const list = employees.filter((e) => !q || (e.employeeId + " " + e.name + " " + e.department).toLowerCase().includes(q)).slice(0, 100);
     if (!list.length) {
-      document.getElementById("empList").innerHTML = '<p class="subtitle">No employees match.</p>';
+      document.getElementById("empList").innerHTML = '<p class="subtitle">No CABIES match.</p>';
       return;
     }
     let html = "<table><tr><th>ID</th><th>Name</th><th>Department</th><th>Status</th><th>Login</th><th>Action</th></tr>";

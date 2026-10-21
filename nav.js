@@ -4,7 +4,7 @@
 // at the top of the page's script.
 
 function roleLabel(role) {
-  if (role === "employee") return "Employee";
+  if (role === "employee") return "CABIES";
   return role; // Committee / Management / Admin
 }
 

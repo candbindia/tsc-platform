@@ -52,7 +52,7 @@ const TOUR_STEPS_STAFF = [
   {
     selector: 'a[href="manage-accounts.html"]',
     title: "Manage Accounts",
-    text: "Create Committee / Management / Admin logins, deactivate them, reset passwords, or help an employee who's locked out.",
+    text: "Create Committee / Management / Admin logins, deactivate them, reset passwords, or help a CABIES member who's locked out.",
   },
 ];
 
