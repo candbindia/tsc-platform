@@ -218,12 +218,14 @@
       h += box("Ready to build", c
         ? '<p class="dim" style="margin:0 0 8px;">The document is signed off by the requester and the Committee.</p>' +
           (it["Needs Review"] === "Yes" ? '<div class="support-note"><span class="flag-review">Needs review before building</span> Data is not available or the rules are not clear. Make sure that is settled.<label class="check-row"><input type="checkbox" id="ackReview"> I have reviewed this and want to build</label></div>' : "") +
+          '<label for="bTarget">When will the build be ready? (target date, required)</label><input type="date" id="bTarget" min="' + dateIn(0) + '" value="' + dateIn(7) + '">' +
           '<div class="support-actions">' + btn("I will build this", "startBuild") + "</div>"
         : '<p class="dim">Waiting for a Committee member to take the build.</p>');
     }
     if (st === "In build") {
       if (c && D.youAreBuilder) {
         h += box("You are building this", '<p class="dim" style="margin:0 0 8px;">When it is ready, add the technical documentation. It is mandatory. Then the requester validates it.</p>' +
+          '<label for="vTarget">By when should the requester validate it? (target date, required)</label><input type="date" id="vTarget" min="' + dateIn(0) + '" value="' + dateIn(7) + '">' +
           '<label for="bLink">Link to the technical file (working https link)</label><input type="text" id="bLink" value="' + escapeHtml(it["Technical File Link"] || "") + '">' +
           '<div class="support-note" style="margin-top:10px;"><strong>For the requester to try.</strong> Give a link to the workable file, or upload it (or both). The requester sees this under My Requests while validating.</div>' +
           '<label for="bTest">Link to the workable file (optional if you upload it)</label><input type="text" id="bTest" placeholder="https://…">' +
@@ -232,7 +234,9 @@
           '<div class="support-actions">' + btn("Send to the requester for validation", "submitBuild") + "</div>");
       } else {
         h += box("In build", '<p class="dim" style="margin:0 0 8px;">Being built by <strong>' + escapeHtml(it["Builder"] || "?") + "</strong>.</p>" +
-          (c ? '<div class="support-actions">' + btn("Take over the build", "() => act('/tracker/build/start', {takeOver:true}, 'You now own the build')", true) + "</div>" : ""));
+          (c ? '<p class="dim" style="margin:8px 0 0;">Build target: <strong>' + escapeHtml(it["Build Target Date"] || "not set") + '</strong></p>' +
+            '<label for="tTarget">New target date' + (it["Build Target Date"] ? " (leave empty to keep the current one)" : " (required)") + '</label><input type="date" id="tTarget" min="' + dateIn(0) + '">' +
+            '<div class="support-actions">' + btn("Take over the build", "takeOverBuild", true) + "</div>" : ""));
       }
     }
     if (st === "Awaiting requester validation") {
@@ -264,12 +268,24 @@
   async function sendForReview() { await act("/tracker/rud/submit-review", {}, "Sent to the requester"); }
   async function startBuild() {
     const ack = document.getElementById("ackReview");
-    await act("/tracker/build/start", { acknowledgeReview: ack ? ack.checked : false }, "You are building this");
+    const t = document.getElementById("bTarget").value;
+    if (!t) return showErr("actErr", "Please pick the date the build will be ready.");
+    await act("/tracker/build/start", { acknowledgeReview: ack ? ack.checked : false, targetDate: t }, "You are building this");
+  }
+  async function takeOverBuild() {
+    const t = document.getElementById("tTarget").value;
+    await act("/tracker/build/start", { takeOver: true, targetDate: t || undefined }, "You now own the build");
+  }
+  function dateIn(days) {
+    const d = new Date(Date.now() + days * 86400000);
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
   }
   async function submitBuild() {
     const f = document.getElementById("bFile").files[0];
     if (f) { const bad = checkPicked([f], FILE_EXT_TOOL); if (bad) return showErr("actErr", bad); }
-    await act("/tracker/build/submit", { technicalLink: document.getElementById("bLink").value.trim(), finalNote: document.getElementById("bNote").value.trim(),
+    const vt = document.getElementById("vTarget").value;
+    if (!vt) return showErr("actErr", "Please pick the date by which the requester should validate.");
+    await act("/tracker/build/submit", { validationTargetDate: vt, technicalLink: document.getElementById("bLink").value.trim(), finalNote: document.getElementById("bNote").value.trim(),
       testLink: document.getElementById("bTest").value.trim(), files: f ? await filesToPayload([f]) : [] }, "Sent to the requester for validation");
   }
   async function proceedIt() { await act("/tracker/validation/proceed", { note: document.getElementById("pNote").value.trim() }, "Moved on to publishing"); }

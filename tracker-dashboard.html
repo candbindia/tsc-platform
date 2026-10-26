@@ -7,27 +7,30 @@
 <link rel="icon" href="favicon.svg">
 <link rel="stylesheet" href="style.css">
 <script src="theme.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
 <body>
 <div class="page wide">
   <h1>TSC Dashboard</h1>
-  <p class="subtitle">Where every requirement stands, across the whole pipeline.</p>
+  <p class="subtitle">Automation requirements: where each one stands, what is late, and who is holding it. <span id="asOf" class="dim"></span></p>
 
   <div class="stat-grid" id="statGrid"></div>
 
-  <div class="chart-grid">
-    <div class="card chart-card">
-      <h2>By status</h2>
-      <canvas id="statusChart"></canvas>
-    </div>
-    <div class="card chart-card">
-      <h2>By priority (scored)</h2>
-      <canvas id="priorityChart"></canvas>
-    </div>
+  <div class="card"><h2>Pipeline by stage</h2>
+    <div class="table-wrap"><table id="pipeTbl"></table></div>
+    <p class="dim" style="margin:8px 0 0;font-size:12px;">Targets are in working days (Mon&ndash;Fri). Build and validation targets are the dates set by the builder.</p>
   </div>
 
-  <div class="icon-card-grid" style="margin-top:4px;">
+  <div class="card"><h2>Overdue</h2><div id="overdueBox"></div></div>
+  <div class="card"><h2>Waiting on requesters</h2><div id="waitBox"></div></div>
+
+  <div class="card"><h2>By priority</h2>
+    <div class="table-wrap"><table id="prioTbl"></table></div>
+    <div id="prioList" style="margin-top:10px;"></div>
+  </div>
+
+  <div class="card"><h2>Not taken forward</h2><div id="declBox"></div></div>
+
+<div class="icon-card-grid" style="margin-top:4px;">
     <a class="icon-card" href="tracker-home.html">
       <div class="ic" id="icRegister"></div>
       <div>
@@ -51,6 +54,7 @@
     </a>
   </div>
 </div>
+</div>
 
 <script src="config.js"></script>
 <script src="auth.js"></script>
@@ -64,133 +68,74 @@
   document.getElementById("icCatalog").innerHTML = icon("archive", 22);
   document.getElementById("icBoard").innerHTML = icon("kanban", 22);
 
+  const E = escapeHtml;
+  function link(id) { return '<a href="tracker-home.html?id=' + encodeURIComponent(id) + '"><strong>' + E(id) + "</strong></a>"; }
+  function empty(msg) { return '<p class="dim" style="margin:0;">' + E(msg) + "</p>"; }
+  function prBadge(p) { return '<span class="role-pill" style="color:' + (PRIORITY_COLORS[p] || "inherit") + ';border-color:' + (PRIORITY_COLORS[p] || "var(--border)") + ';">' + E(p) + "</span>"; }
+
   async function load() {
     const session = renderTopbar();
     if (!guardRoles(session, ["Committee", "Management"])) return;
-
     try {
-      const data = await apiFetch("/tracker/requirements");
-      let openSupport = null;
-      try {
-        const sup = await apiFetch("/support/desk");
-        openSupport = (sup.items || []).filter((i) => ["New", "In progress", "Waiting for requester"].includes(i["Status"])).length;
-      } catch (e) { /* support tabs not set up yet - skip the tile */ }
-      renderSummary(data.items || [], openSupport);
-    } catch (err) {
-      showToast(err.message, "error");
-    }
-
+      render(await apiFetch("/tracker/dashboard"));
+    } catch (err) { showToast(err.message, "error"); }
     maybeStartTour(session);
   }
 
-  function renderSummary(items, openSupport) {
-    const total = items.length;
-    const byStatus = {};
-    const byPriority = { High: 0, Medium: 0, Low: 0 };
-
-    items.forEach((it) => {
-      const status = (it["Status"] || "").trim();
-      if (status) byStatus[status] = (byStatus[status] || 0) + 1;
-      const p = (it["Priority Classification"] || "").trim();
-      if (byPriority[p] !== undefined) byPriority[p]++;
-    });
-
-    const liveCount = byStatus["Live"] || 0;
-    const needsCommitteeAction = ["Submitted", "Under committee review", "Scoring", "Score confirmed", "RUD draft", "RUD signed off", "Publishing"]
-      .reduce((n, k) => n + (byStatus[k] || 0), 0);
-    const waitingRequester = (byStatus["RUD under review"] || 0) + (byStatus["Awaiting requester validation"] || 0);
-    const hoursLive = Math.round(items.filter((i) => i["Status"] === "Live").reduce((n, i) => n + (Number(i["Hours Per Month"]) || 0), 0));
-
-    renderStats([
-      { icon: "clipboard", number: total, label: "Total requirements" },
-      { icon: "user-check", number: needsCommitteeAction, label: "Waiting on the Committee" },
-      { icon: "clock", number: waitingRequester, label: "Waiting on requesters" },
-      { icon: "check-circle", number: liveCount, label: "Live" },
-      { icon: "trending-up", number: hoursLive, label: "Hours a month freed (live)" },
-    ].concat(openSupport === null ? [] : [{ icon: "lifebuoy", number: openSupport, label: "Open support requests" }]));
-
-    try {
-      renderCharts(byStatus, byPriority);
-    } catch (err) {
-      // Chart.js is loaded from a CDN — if it's blocked or slow on someone's
-      // network, the rest of the dashboard (stats above) should still work.
-      document.querySelectorAll(".chart-card").forEach((el) => {
-        el.querySelector("canvas").outerHTML = '<p class="subtitle" style="margin:0;">Chart couldn\'t load — check your connection.</p>';
-      });
-    }
+  function table(cols, rows) {
+    return "<table><thead><tr>" + cols.map((c) => "<th>" + E(c) + "</th>").join("") + "</tr></thead><tbody>" +
+      rows.map((r) => "<tr>" + r.map((c) => "<td>" + c + "</td>").join("") + "</tr>").join("") + "</tbody></table>";
   }
 
-  function renderStats(stats) {
-    let html = "";
-    stats.forEach((s) => {
-      html +=
-        '<div class="stat-tile"><div class="stat-icon">' + icon(s.icon, 20) + "</div><div>" +
-        '<div class="stat-number">' + s.number + "</div>" +
-        '<div class="stat-label">' + escapeHtml(s.label) + "</div>" +
-        "</div></div>";
-    });
-    document.getElementById("statGrid").innerHTML = html;
-  }
-
-  let statusChartInstance, priorityChartInstance;
-  let lastSummary = null;
-
-  // Chart colours follow the active theme (light default, dark opt-in).
-  function chartTheme() {
-    const dark = typeof getTheme === "function" && getTheme() === "dark";
-    return {
-      text: dark ? "#9c9c97" : "#646767",
-      grid: dark ? "#333330" : "#e4e2dc",
-      remap: dark ? { "#d9534f": "#ff8d82", "#2e9e5b": "#81c995" } : {},
-    };
-  }
-
-  window.addEventListener("themechange", function () {
-    if (lastSummary) {
-      try { renderCharts(lastSummary.byStatus, lastSummary.byPriority); } catch (e) {}
-    }
-  });
-
-  function renderCharts(byStatus, byPriority) {
-    lastSummary = { byStatus, byPriority };
-    const th = chartTheme();
-    const statusLabels = STATUS_ORDER.filter((s) => byStatus[s]).concat(Object.keys(byStatus).filter((s) => !STATUS_META[s]));
-    const statusData = statusLabels.map((s) => byStatus[s]);
-    const statusColors = statusLabels.map((s) => { const c = STATUS_COLORS[s] || "#646767"; return th.remap[c] || c; });
-
-    const statusCtx = document.getElementById("statusChart");
-    if (statusChartInstance) statusChartInstance.destroy();
-    if (!statusLabels.length) {
-      statusCtx.getContext("2d").clearRect(0, 0, statusCtx.width, statusCtx.height);
-    } else {
-      statusChartInstance = new Chart(statusCtx, {
-        type: "doughnut",
-        data: { labels: statusLabels, datasets: [{ data: statusData, backgroundColor: statusColors, borderWidth: 0 }] },
-        options: {
-          plugins: { legend: { position: "bottom", labels: { color: th.text, font: { size: 11 }, padding: 10 } } },
-        },
-      });
+  function render(d) {
+    const h = d.headline;
+    document.getElementById("asOf").textContent = "As of " + d.today + ".";
+    const liveLabel = h.liveOnTime + h.liveLate ? "Live (" + h.liveOnTime + " on time, " + h.liveLate + " late)" : "Live";
+    const stats = [
+      { icon: "clock", number: h.inProgress, label: "In progress" },
+      { icon: "x-circle", number: h.overdue, label: "Overdue" },
+      { icon: "check-circle", number: h.withinTarget, label: "Within target" },
+      { icon: "check-circle", number: h.live, label: liveLabel },
+      { icon: "user-check", number: h.waitingOnRequesters, label: "Waiting on requesters" },
+      { icon: "clipboard", number: h.total, label: "Total requirements" },
+    ];
+    document.getElementById("statGrid").innerHTML = stats.map((s) =>
+      '<div class="stat-tile"><div class="stat-icon">' + icon(s.icon, 20) + "</div><div>" +
+      '<div class="stat-number">' + s.number + '</div><div class="stat-label">' + E(s.label) + "</div></div></div>").join("");
+    if (h.noTarget) {
+      document.getElementById("asOf").textContent += " " + h.noTarget + " in progress without a target date are not counted as overdue.";
     }
 
-    const priorityLabels = ["High", "Medium", "Low"];
-    const priorityData = priorityLabels.map((p) => byPriority[p]);
-    const priorityColors = priorityLabels.map((p) => PRIORITY_COLORS[p]);
+    document.getElementById("pipeTbl").innerHTML = table(
+      ["Stage", "Target", "In stage", "Avg days there", "Overdue"],
+      d.pipeline.map((p) => [E(p.label), E(p.target), String(p.count), p.count ? String(p.avgDays) : "-",
+        p.overdue ? '<strong style="color:var(--error-text);">' + p.overdue + "</strong>" : "0"]));
 
-    const priorityCtx = document.getElementById("priorityChart");
-    if (priorityChartInstance) priorityChartInstance.destroy();
-    priorityChartInstance = new Chart(priorityCtx, {
-      type: "bar",
-      data: { labels: priorityLabels, datasets: [{ data: priorityData, backgroundColor: priorityColors, borderRadius: 6, maxBarThickness: 60 }] },
-      options: {
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { ticks: { color: th.text }, grid: { display: false } },
-          y: { ticks: { color: th.text, precision: 0 }, grid: { color: th.grid } },
-        },
-      },
-    });
+    document.getElementById("overdueBox").innerHTML = d.overdue.length ? '<div class="table-wrap">' + table(
+      ["Requirement", "Requester", "Stage", "Held by", "Was due", "Late by", "Priority"],
+      d.overdue.map((o) => [link(o.id) + '<div class="dim" style="font-size:12px;">' + E(o.summary) + "</div>", E(o.requester) + '<div class="dim" style="font-size:12px;">' + E(o.department) + "</div>",
+        E(o.stageLabel), E(o.holder + (o.holder === "Builder" && o.builder ? " (" + o.builder + ")" : "")), E(o.due), o.workingDaysOver + " working day(s)", prBadge(o.priority)])) + "</div>"
+      : empty("Nothing is overdue.");
+
+    document.getElementById("waitBox").innerHTML = d.waiting.length ? '<div class="table-wrap">' + table(
+      ["Requirement", "Requester", "Waiting for", "Days waiting", "Target"],
+      d.waiting.map((o) => [link(o.id) + '<div class="dim" style="font-size:12px;">' + E(o.summary) + "</div>", E(o.requester) + '<div class="dim" style="font-size:12px;">' + E(o.department) + "</div>",
+        E(o.status === "Awaiting requester validation" ? "Validation" : "RUD confirmation"), String(o.daysInStage),
+        o.overdue ? '<span style="color:var(--error-text);">' + E(o.due) + " (passed)</span>" : E(o.due || "-")])) + "</div>"
+      : empty("No requester is being waited on.");
+
+    const pc = d.priority.counts;
+    document.getElementById("prioTbl").innerHTML = table(["Priority", "In progress", "Overdue", "Live"],
+      ["High", "Medium", "Low", "Unscored"].map((k) => [k === "Unscored" ? "Not scored yet" : prBadge(k), String(pc[k].active), String(pc[k].overdue), String(pc[k].live)]));
+    const top = d.priority.items.filter((o) => o.priority !== "Unscored").slice(0, 8);
+    document.getElementById("prioList").innerHTML = top.length ? '<div class="table-wrap">' + table(["Requirement", "Score", "Stage", "Due"],
+      top.map((o) => [link(o.id) + " " + prBadge(o.priority) + '<div class="dim" style="font-size:12px;">' + E(o.summary) + "</div>", E(o.score), E(o.stageLabel),
+        o.overdue ? '<strong style="color:var(--error-text);">' + E(o.due) + "</strong>" : E(o.due || "-")])) + "</div>" : "";
+
+    document.getElementById("declBox").innerHTML = d.declined.length ? '<div class="table-wrap">' + table(["Requirement", "Requester", "Reason", "Date"],
+      d.declined.map((o) => [link(o.id), E(o.requester) + '<div class="dim" style="font-size:12px;">' + E(o.department) + "</div>", E(o.reason || "-"), E(o.declinedOn || "-")])) + "</div>"
+      : empty("Nothing has been declined.");
   }
-
   load();
 </script>
 </body>
