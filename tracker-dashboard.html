@@ -13,6 +13,10 @@
   <h1>TSC Dashboard</h1>
   <p class="subtitle">Automation requirements: where each one stands, what is late, and who is holding it. <span id="asOf" class="dim"></span></p>
 
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px;">
+    <button class="btn-sm" id="waBtn" type="button">Copy WhatsApp summary</button>
+    <button class="btn-sm secondary" id="testBtn" type="button" style="display:none;">Email me a test of the daily mail</button>
+  </div>
   <div class="stat-grid" id="statGrid"></div>
 
   <div class="card"><h2>Pipeline by stage</h2>
@@ -54,7 +58,6 @@
     </a>
   </div>
 </div>
-</div>
 
 <script src="config.js"></script>
 <script src="auth.js"></script>
@@ -87,7 +90,28 @@
       rows.map((r) => "<tr>" + r.map((c) => "<td>" + c + "</td>").join("") + "</tr>").join("") + "</tbody></table>";
   }
 
+  let waText = "";
+  async function copyText(t) {
+    try { await navigator.clipboard.writeText(t); return true; }
+    catch (e) {
+      const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select();
+      let ok = false; try { ok = document.execCommand("copy"); } catch (x) {} ta.remove(); return ok;
+    }
+  }
+  document.getElementById("waBtn").addEventListener("click", async () => {
+    if (!waText) return;
+    showToast((await copyText(waText)) ? "Copied. Paste it in the WhatsApp group." : "Could not copy. Please try again.", "success");
+  });
+  document.getElementById("testBtn").addEventListener("click", async () => {
+    const b = document.getElementById("testBtn"); b.disabled = true;
+    try { const r = await apiFetch("/tracker/daily-mail/test", { method: "POST", body: JSON.stringify({}) }); showToast("Test mail sent to " + r.sentTo, "success"); }
+    catch (e) { showToast(e.message, "error"); }
+    b.disabled = false;
+  });
+
   function render(d) {
+    waText = d.whatsapp || "";
+    try { const s = getSession(); if (s && s.role === "Committee") document.getElementById("testBtn").style.display = ""; } catch (e) {}
     const h = d.headline;
     document.getElementById("asOf").textContent = "As of " + d.today + ".";
     const liveLabel = h.liveOnTime + h.liveLate ? "Live (" + h.liveOnTime + " on time, " + h.liveLate + " late)" : "Live";
