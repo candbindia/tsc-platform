@@ -208,7 +208,7 @@
     document.getElementById("waitBox").innerHTML = d.waiting.length ? '<div class="table-wrap">' + table(
       ["Requirement", "Requester", "Waiting for", "Days waiting", "Target"],
       d.waiting.map((o) => [link(o.id) + '<div class="dim" style="font-size:12px;">' + E(o.summary) + "</div>", E(o.requester) + '<div class="dim" style="font-size:12px;">' + E(o.department) + "</div>",
-        E(o.status === "Awaiting requester validation" ? "Validation" : "RUD confirmation"), String(o.daysInStage),
+        E(o.status === "Awaiting requester validation" ? "Validation" : "RUD confirmation"), String(o.waitDays),
         o.overdue ? '<span style="color:var(--error-text);">' + E(o.due) + " (passed)</span>" : E(o.due || "-")])) + "</div>"
       : empty("No requester is being waited on.");
 
