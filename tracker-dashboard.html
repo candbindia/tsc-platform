@@ -17,6 +17,16 @@
     <button class="btn-sm" id="waBtn" type="button">Copy WhatsApp summary</button>
     <button class="btn-sm secondary" id="testBtn" type="button" style="display:none;">Email me a test of the daily mail</button>
   </div>
+  <div class="card" id="noteCard" style="display:none;">
+    <h2>Note for tomorrow's 10 AM mail</h2>
+    <p class="dim" style="margin:0 0 8px;font-size:12px;">Shown at the top of the next daily mail, then cleared. Leave it empty for no note. Up to 300 characters.</p>
+    <textarea id="noteText" rows="2" maxlength="300" style="width:100%;"></textarea>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px;"><button class="btn-sm" id="noteSave" type="button">Save note</button><span class="dim" id="noteInfo" style="font-size:12px;"></span></div>
+  </div>
+  <div class="card" id="attCard" style="display:none;"><h2>Needs Management's attention</h2><div id="attBox"></div></div>
+  <div class="card"><h2>Work done since yesterday</h2><div id="actBox"></div></div>
+
+  <h2 style="margin:22px 0 8px;">Part 1: Automation</h2>
   <div class="stat-grid" id="statGrid"></div>
 
   <div class="card"><h2>Pipeline by stage</h2>
@@ -33,6 +43,12 @@
   </div>
 
   <div class="card"><h2>Not taken forward</h2><div id="declBox"></div></div>
+
+  <h2 style="margin:26px 0 8px;">Part 2: Technology Support</h2>
+  <div class="stat-grid" id="supStats"></div>
+  <div class="card"><h2>Needs attention</h2><div id="supAttBox"></div></div>
+  <div class="card"><h2>Waiting on requesters</h2><div id="supWaitBox"></div></div>
+  <div class="card"><h2>Since yesterday</h2><div id="supSinceBox"></div></div>
 
 <div class="icon-card-grid" style="margin-top:4px;">
     <a class="icon-card" href="tracker-home.html">
@@ -109,9 +125,57 @@
     b.disabled = false;
   });
 
+  document.getElementById("noteSave").addEventListener("click", async () => {
+    const b = document.getElementById("noteSave"); b.disabled = true;
+    try { await apiFetch("/tracker/daily-note", { method: "POST", body: JSON.stringify({ note: document.getElementById("noteText").value }) }); showToast("Note saved", "success"); document.getElementById("noteInfo").textContent = "Saved just now."; }
+    catch (e) { showToast(e.message, "error"); }
+    b.disabled = false;
+  });
+  async function loadNote() {
+    try {
+      const n = await apiFetch("/tracker/daily-note");
+      document.getElementById("noteText").value = n.text || "";
+      document.getElementById("noteInfo").textContent = n.text ? "Saved by " + n.by + " at " + n.savedAt + "." : "";
+    } catch (e) {}
+  }
+
+  function renderSupport(sp) {
+    if (sp.failed) { ["supStats", "supAttBox", "supWaitBox", "supSinceBox"].forEach((id) => { document.getElementById(id).innerHTML = empty("The support figures could not be read."); }); return; }
+    const k = sp.headline;
+    const tiles = [
+      { icon: "lifebuoy", number: k.open, label: "Open" }, { icon: "x-circle", number: k.overdue, label: "Overdue" },
+      { icon: "clock", number: k.notPickedUp, label: "Not picked up" }, { icon: "user-check", number: k.waiting, label: "Waiting on requesters" },
+      { icon: "check-circle", number: k.completedThisMonth, label: "Completed this month" },
+    ];
+    document.getElementById("supStats").innerHTML = tiles.map((s) =>
+      '<div class="stat-tile"><div class="stat-icon">' + icon(s.icon, 20) + "</div><div>" +
+      '<div class="stat-number">' + s.number + '</div><div class="stat-label">' + E(s.label) + "</div></div></div>").join("");
+    document.getElementById("supAttBox").innerHTML = sp.attention.length ? '<div class="table-wrap">' + table(["Request", "Reason", "Was due", "Late by"],
+      sp.attention.map((o) => ["<strong>" + E(o.id) + "</strong> " + prBadgeS(o.priority) + " " + E(o.title) + '<div class="dim" style="font-size:12px;">' + E(o.category + (o.department ? " - " + o.department : "")) + "</div>",
+        E(o.reason) + (o.neededByPassed ? '<div style="font-size:12px;color:var(--error-text);">Requester\'s date passed</div>' : ""), E(o.due), o.workingDaysOver + " working day(s)"])) + "</div>"
+      : empty("Nothing needs attention.");
+    document.getElementById("supWaitBox").innerHTML = sp.waiting.length ? '<div class="table-wrap">' + table(["Request", "Department", "Days waiting"],
+      sp.waiting.map((o) => ["<strong>" + E(o.id) + "</strong> " + E(o.title) + '<div class="dim" style="font-size:12px;">' + E(o.category) + "</div>", E(o.department || "-"), String(o.daysWaiting)])) + "</div>"
+      : empty("No requester is being waited on.");
+    const T = sp.since, rows = [];
+    if (T.raised.length) rows.push("<b>Raised:</b> " + T.raised.map((x) => E(x.id + " " + x.title)).join("; "));
+    if (T.completed.length) rows.push("<b>Completed:</b> " + T.completed.map((x) => E(x.id + " " + x.title)).join("; "));
+    if (T.declined.length) rows.push("<b>Declined:</b> " + T.declined.map((x) => E(x.id + (x.reason ? " (" + x.reason + ")" : ""))).join("; "));
+    if (T.reopened.length) rows.push("<b>Reopened:</b> " + T.reopened.map((x) => E(x.id + " " + x.title)).join("; "));
+    document.getElementById("supSinceBox").innerHTML = rows.length ? '<div style="line-height:1.7;">' + rows.join("<br>") + "</div>"
+      : empty(sp.attention.length ? "Nothing new since yesterday." : "All on track. Nothing new since yesterday.");
+  }
+  function prBadgeS(p) { const c = (p === "Urgent" ? "#d9534f" : "var(--text-muted)"); return '<span class="role-pill" style="color:' + c + ';border-color:' + c + ';">' + E(p) + "</span>"; }
+
   function render(d) {
     waText = d.whatsapp || "";
-    try { const s = getSession(); if (s && s.role === "Committee") document.getElementById("testBtn").style.display = ""; } catch (e) {}
+    document.getElementById("attCard").style.display = d.attention.length ? "" : "none";
+    document.getElementById("attBox").innerHTML = '<div style="line-height:1.7;">' + d.attention.map((a) => "&#9679; " + E(a.text)).join("<br>") + "</div>";
+    document.getElementById("actBox").innerHTML = d.activity.length
+      ? '<div style="line-height:1.7;">' + d.activity.map((a) => "&#9679; <b>" + E(a.by) + ":</b> " + E(a.text)).join("<br>") + "</div>"
+      : empty("No actions were recorded in the portal since yesterday.");
+    renderSupport(d.support);
+    try { const s = getSession(); if (s && s.role === "Committee") document.getElementById("testBtn").style.display = ""; document.getElementById("noteCard").style.display = ""; loadNote(); } catch (e) {}
     const h = d.headline;
     document.getElementById("asOf").textContent = "As of " + d.today + ".";
     const liveLabel = h.liveOnTime + h.liveLate ? "Live (" + h.liveOnTime + " on time, " + h.liveLate + " late)" : "Live";
