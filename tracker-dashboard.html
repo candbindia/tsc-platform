@@ -19,8 +19,8 @@
   </div>
   <div class="card" id="noteCard" style="display:none;">
     <h2>Note for tomorrow's 10 AM mail</h2>
-    <p class="dim" style="margin:0 0 8px;font-size:12px;">Shown at the top of the next daily mail, then cleared. Leave it empty for no note. Up to 300 characters.</p>
-    <textarea id="noteText" rows="2" maxlength="300" style="width:100%;"></textarea>
+    <p class="dim" style="margin:0 0 8px;font-size:12px;">Shown at the top of the next daily mail, then cleared. Leave it empty for no note.</p>
+    <textarea id="noteText" rows="4" style="width:100%;"></textarea>
     <div style="display:flex;gap:8px;align-items:center;margin-top:8px;"><button class="btn-sm" id="noteSave" type="button">Save note</button><span class="dim" id="noteInfo" style="font-size:12px;"></span></div>
   </div>
   <div class="card" id="attCard" style="display:none;"><h2>Needs Management's attention</h2><div id="attBox"></div></div>
@@ -180,6 +180,7 @@
     document.getElementById("asOf").textContent = "As of " + d.today + ".";
     const liveLabel = h.liveOnTime + h.liveLate ? "Live (" + h.liveOnTime + " on time, " + h.liveLate + " late)" : "Live";
     const stats = [
+      { icon: "clipboard", number: h.newCount, label: "New (not started)" },
       { icon: "clock", number: h.inProgress, label: "In progress" },
       { icon: "x-circle", number: h.overdue, label: "Overdue" },
       { icon: "check-circle", number: h.withinTarget, label: "Within target" },
